@@ -1,10 +1,6 @@
-import socket
-import time
-
 import ray
 import torch
 import torch.distributed as dist
-from tqdm import tqdm
 
 if torch.version.hip:
     from vllm.device_allocator.cumem import CuMemAllocator
@@ -12,11 +8,10 @@ else:
     from cumem_allocator import CuMemAllocator
 
 from megatron.core import mpu
-from sglang.srt.utils import MultiprocessingSerializer
+
 from transformers import AutoConfig, AutoTokenizer
 
 from slime.ray.ppo_actor import TrainRayActor
-from slime.utils.distributed_utils import init_process_group
 from slime.utils.memory_utils import clear_memory, print_memory
 from slime.utils.timer import Timer, timer
 
@@ -27,11 +22,9 @@ from .initialize import get_gloo_group, init
 from .loss import compute_advantages_and_returns
 from .model import forward_only, initialize_model_and_optimizer, save, train
 from .update_weight_utils import (
-    all_gather_param,
-    convert_to_hf,
-    get_param_info_buckets,
     named_parameters,
-    remove_padding,
+    UpdateWeightFromTensor,
+    UpdateWeightFromDistributed,
 )
 
 
@@ -48,13 +41,6 @@ class MegatronTrainRayActor(TrainRayActor):
                 self.hf_config = AutoConfig.from_pretrained(args.hf_checkpoint, trust_remote_code=True)
                 self.tokenizer = AutoTokenizer.from_pretrained(self.args.hf_checkpoint, trust_remote_code=True)
             dist.barrier(group=get_gloo_group())
-
-        if self.args.model_name is None:
-            self.model_name = type(self.hf_config).__name__.lower()
-        else:
-            self.model_name = self.args.model_name
-        self.quantization_config = getattr(self.hf_config, "quantization_config", None)
-        self.vocab_size = self.tokenizer.vocab_size if self.args.vocab_size is None else self.args.vocab_size
 
         if self.args.debug_rollout_only:
             Timer().start("train_wait")
@@ -78,14 +64,20 @@ class MegatronTrainRayActor(TrainRayActor):
             self.update_gpu_params_dict(self.weights["actor"])
             self.sleep(("model"))
 
-        if self.args.colocate:
-            self.param_info_buckets = get_param_info_buckets(self.args, self.model)
+        update_weight_cls = UpdateWeightFromTensor if self.args.colocate else UpdateWeightFromDistributed
+        self.weight_updator = update_weight_cls(
+            self.args,
+            self.model,
+            self.weights,
+            model_name=type(self.hf_config).__name__.lower() if self.args.model_name is None else self.args.model_name,
+            quantization_config=getattr(self.hf_config, "quantization_config", None),
+            vocab_size=self.tokenizer.vocab_size if self.args.vocab_size is None else self.args.vocab_size,
+        )
 
         # empty cache after initialization
         clear_memory()
 
         self.rollout_engines = None
-        self.rollout_engine_lock = None
         self.data_buffer = None
 
         self.rollout_data_postprocess = None
@@ -143,68 +135,6 @@ class MegatronTrainRayActor(TrainRayActor):
 
         clear_memory()
         print_memory("after wake_up model")
-
-    def connect_rollout_engines(self, rollout_engines, rollout_engine_lock):
-        self.rollout_engines = rollout_engines
-        self.rollout_engine_lock = rollout_engine_lock
-
-        if self.args.debug_train_only or self.args.debug_rollout_only:
-            return
-
-        if self.args.colocate:
-            # Here we assume the gpu id of rollout engines and train actors are the same.
-            for i, engine in enumerate(self.rollout_engines):
-                start_rank = i * self.args.rollout_num_gpus_per_engine
-                end_rank = (i + 1) * self.args.rollout_num_gpus_per_engine
-                group_ranks = list(range(start_rank, end_rank))
-                new_group = dist.new_group(
-                    ranks=group_ranks,
-                    backend="gloo",
-                )
-                if dist.get_rank() in group_ranks:
-                    self._ipc_gather_src = start_rank
-                    self._ipc_gather_group = new_group
-                    self._ipc_engine = engine
-        else:
-            # For TP:
-            #   1. AllGather paramters to rank 0
-            #   2. Broadcast parameters from rank 0 to all sglang engines
-            self._is_pp_src_rank = (
-                mpu.get_data_parallel_rank(with_context_parallel=True) == 0
-                and mpu.get_tensor_model_parallel_rank() == 0
-            )
-            pp_rank = mpu.get_pipeline_model_parallel_rank()
-            if self._is_pp_src_rank:
-                self._group_name = f"slime-pp_{pp_rank}"
-
-            if self._is_pp_src_rank:
-                master_address = ray._private.services.get_node_ip_address()
-                with socket.socket() as sock:
-                    sock.bind(("", 0))
-                    master_port = sock.getsockname()[1]
-                world_size = self.args.rollout_num_gpus + 1
-
-                refs = [
-                    engine.init_process_group.remote(
-                        master_address,
-                        master_port,
-                        i * self.args.rollout_num_gpus_per_engine + 1,
-                        world_size,
-                        self._group_name,
-                        backend="nccl",
-                    )
-                    for i, engine in enumerate(self.rollout_engines)
-                ]
-                self._model_update_groups = init_process_group(
-                    backend="nccl",
-                    init_method=f"tcp://{master_address}:{master_port}",
-                    world_size=world_size,
-                    rank=0,
-                    group_name=self._group_name,
-                )
-                ray.get(refs)
-
-        dist.barrier(group=get_gloo_group())
 
     def set_data_buffer(self, data_buffer):
         self.data_buffer = data_buffer
@@ -340,219 +270,14 @@ class MegatronTrainRayActor(TrainRayActor):
         else:
             save(iteration, self.model, None, None)
 
-    def update_weights_from_distributed(self):
-        if dist.get_rank() == 0:
-            ray.get([engine.pause_generation.remote() for engine in self.rollout_engines])
-            ray.get([engine.reset_prefix_cache.remote() for engine in self.rollout_engines])
-        dist.barrier(group=get_gloo_group())
+    def connect_rollout_engines(self, rollout_engines, rollout_engine_lock):
+        self.rollout_engines = rollout_engines
 
-        buffer_size = 0
-        converted_named_tensors = []
-        # non expert params
-        pbar = tqdm(desc=f"[{self._group_name}] Update weights", total=0) if self._is_pp_src_rank else None
-
-        for name, param in named_parameters(self.args, self.model):
-            if ".experts." in name:
-                continue
-            buffer_size = self._update_weight_from_distributed(
-                name, param, converted_named_tensors, buffer_size, pbar=pbar
-            )
-
-        if converted_named_tensors:
-            self._update_bucket_weights_from_distributed(converted_named_tensors, pbar=pbar)
-
-        dist.barrier(group=get_gloo_group())
-
-        buffer_size = 0
-        named_tensors = []
-        for name, param in named_parameters(self.args, self.model):
-            if ".experts." not in name:
-                continue
-            buffer_size = self._update_expert_weight_from_distributed(
-                name, param, named_tensors, buffer_size, pbar=pbar
-            )
-
-        if named_tensors:
-            self._update_expert_bucket_weights_from_distributed(named_tensors, pbar=pbar)
-
-        dist.barrier(group=get_gloo_group())
-        if dist.get_rank() == 0:
-            ray.get([engine.continue_generation.remote() for engine in self.rollout_engines])
-        dist.barrier(group=get_gloo_group())
-
-    def _update_weight_from_distributed(self, name, param, converted_named_tensors, buffer_size, pbar=None):
-        param = all_gather_param(name, param)
-        param = remove_padding(name, param, self.vocab_size)
-        if not self._is_pp_src_rank:
+        if self.args.debug_train_only or self.args.debug_rollout_only:
             return
 
-        param_size = param.numel() * param.element_size()
-        if buffer_size + param_size > self.args.update_weight_buffer_size:
-            self._update_bucket_weights_from_distributed(converted_named_tensors, pbar=pbar)
-            buffer_size = 0
-        converted_named_tensors += convert_to_hf(self.args, self.model_name, name, param, self.quantization_config)
-        buffer_size += param_size
-        return buffer_size
-
-    def _update_expert_weight_from_distributed(self, name, param, named_tensors, buffer_size, pbar=None):
-        param = all_gather_param(name, param)
-        param = remove_padding(name, param, self.vocab_size)
-
-        param_size = param.numel() * param.element_size()
-        if (
-            buffer_size + param_size
-        ) * mpu.get_expert_model_parallel_world_size() > self.args.update_weight_buffer_size:
-            self._update_expert_bucket_weights_from_distributed(named_tensors, pbar=pbar)
-            buffer_size = 0
-
-        named_tensors.append((name, param))
-        buffer_size += param_size
-        return buffer_size
-
-    def _update_expert_bucket_weights_from_distributed(self, named_tensors, pbar=None):
-        names = [name for name, _ in named_tensors]
-        all_names = [None] * mpu.get_expert_model_parallel_world_size()
-        dist.all_gather_object(all_names, names, group=mpu.get_expert_model_parallel_group())
-
-        for names in all_names:
-            assert len(named_tensors) == len(names), f"mismatch names length: {len(named_tensors)} != {len(names)}"
-
-        all_gathered_params = [[] for _ in range(mpu.get_expert_model_parallel_world_size())]
-        handles = []
-        for i, (name, param) in enumerate(named_tensors):
-            params = [
-                torch.empty_like(param.data, device=torch.cuda.current_device())
-                for _ in range(mpu.get_expert_model_parallel_world_size())
-            ]
-            handle = dist.all_gather(params, param.data, group=mpu.get_expert_model_parallel_group(), async_op=True)
-            handles.append(handle)
-            for ep_rank, names in enumerate(all_names):
-                all_gathered_params[ep_rank].append((names[i], params[ep_rank]))
-        for handle in handles:
-            handle.wait()
-
-        named_tensors.clear()
-        if not self._is_pp_src_rank:
-            return
-
-        all_gathered_params = sum(all_gathered_params, [])
-        converted_hf_tensors = []
-        for name, param in all_gathered_params:
-            converted_hf_tensors += convert_to_hf(self.args, self.model_name, name, param, self.quantization_config)
-        self._update_bucket_weights_from_distributed(converted_hf_tensors, pbar=pbar)
-
-    def _update_bucket_weights_from_distributed(self, converted_named_tensors, pbar=None):
-        # lock the rollout engines to prevent dead lock on broadcast.
-        while not ray.get(self.rollout_engine_lock.acquire.remote()):
-            time.sleep(0.1)
-
-        refs = [
-            engine.update_weights_from_distributed.remote(
-                names=[name for name, _ in converted_named_tensors],
-                dtypes=[param.dtype for _, param in converted_named_tensors],
-                shapes=[param.shape for _, param in converted_named_tensors],
-                group_name=self._group_name,
-            )
-            for engine in self.rollout_engines
-        ]
-
-        handles = []
-        for _, param in converted_named_tensors:
-            handles.append(dist.broadcast(param.data, 0, group=self._model_update_groups, async_op=True))
-        for handle in handles:
-            handle.wait()
-
-        ray.get(refs)
-        converted_named_tensors.clear()
-        ray.get(self.rollout_engine_lock.release.remote())
-        pbar.update(1)
-
-    def update_weights_from_tensor(self):
-        rank = dist.get_rank()
-        if rank == 0:
-            ray.get([engine.reset_prefix_cache.remote() for engine in self.rollout_engines])
+        self.weight_updator.connect_rollout_engines(rollout_engines, rollout_engine_lock)
         dist.barrier(group=get_gloo_group())
-        for param_infos in tqdm(self.param_info_buckets, disable=rank != 0, desc="Update weights"):
-            self._update_bucket_weights_from_tensor(param_infos)
-
-    def _update_bucket_weights_from_tensor(self, param_infos):
-        pp_size = mpu.get_pipeline_model_parallel_world_size()
-        ep_size = mpu.get_expert_model_parallel_world_size()
-        rank = dist.get_rank()
-        # init params:
-        params = []
-        for info in param_infos:
-            if dist.get_rank() == info.src_rank:
-                params.append(
-                    torch.nn.Parameter(
-                        self.weights["actor"][info.name].to(device=torch.cuda.current_device(), non_blocking=True)
-                    )
-                )
-            else:
-                params.append(torch.empty(info.shape, dtype=info.dtype, device=torch.cuda.current_device()))
-        torch.cuda.synchronize()
-
-        # broadcast params across pp ranks
-        if pp_size > 1:
-            handles = []
-            for info, param in zip(param_infos, params):
-                if info.src_rank in dist.get_process_group_ranks(mpu.get_pipeline_model_parallel_group()):
-                    handles.append(
-                        torch.distributed.broadcast(
-                            param, src=info.src_rank, group=mpu.get_pipeline_model_parallel_group(), async_op=True
-                        )
-                    )
-            for handle in handles:
-                handle.wait()
-
-        # broadcast params across ep ranks
-        if ep_size > 1:
-            handles = []
-            for info, param in zip(param_infos, params):
-                if ".experts." in info.name:
-                    src_rank = (
-                        info.src_rank
-                        if info.src_rank in dist.get_process_group_ranks(mpu.get_expert_model_parallel_group())
-                        else rank
-                    )
-                    handles.append(
-                        torch.distributed.broadcast(
-                            param, src=src_rank, group=mpu.get_expert_model_parallel_group(), async_op=True
-                        )
-                    )
-            for handle in handles:
-                handle.wait()
-
-        converted_named_tensors = []
-        for info, param in zip(param_infos, params):
-            # set tp attrs
-            for key, value in info.attrs.items():
-                setattr(param, key, value)
-            # gather param
-            param = all_gather_param(info.name, param)
-            param = remove_padding(info.name, param, self.vocab_size)
-            converted_named_tensors.extend(
-                convert_to_hf(self.args, self.model_name, info.name, param, self.quantization_config)
-            )
-        self._update_converted_params_from_tensor(converted_named_tensors)
-
-    def _update_converted_params_from_tensor(self, converted_named_tensors):
-        ipc_handle = MultiprocessingSerializer.serialize(converted_named_tensors, output_str=True)
-        ipc_handles = (
-            [None] * dist.get_world_size(self._ipc_gather_group) if self._ipc_gather_src == dist.get_rank() else None
-        )
-        dist.gather_object(
-            ipc_handle,
-            object_gather_list=ipc_handles,
-            dst=self._ipc_gather_src,
-            group=self._ipc_gather_group,
-        )
-
-        if dist.get_rank() == self._ipc_gather_src:
-            ref = self._ipc_engine.update_weights_from_tensor.remote(
-                ipc_handles=ipc_handles,
-            )
-            ray.get(ref)
 
     @timer
     def update_weights(self):
@@ -560,11 +285,7 @@ class MegatronTrainRayActor(TrainRayActor):
             return
 
         torch.cuda.empty_cache()
-        if not self.args.colocate:
-            self.update_weights_from_distributed()
-        else:
-            self.update_weights_from_tensor()
-
+        self.weight_updator.update_weights()
         dist.barrier(group=get_gloo_group())
         clear_memory()
         print_memory("after update_weights")
