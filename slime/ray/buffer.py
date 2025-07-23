@@ -1,7 +1,7 @@
 import copy
 import logging
 import os
-import pickle
+from pathlib import Path
 from typing import Any, Union
 
 import ray
@@ -46,6 +46,11 @@ class Buffer:
 
         if args.rollout_global_dataset:
             tokenizer = AutoTokenizer.from_pretrained(args.hf_checkpoint, trust_remote_code=True)
+
+            # TODO move (during the refactor)
+            if (d := args.dump_details) is not None:
+                tokenizer.save_pretrained(Path(d) / "tokenizer")
+
             self.dataset = Dataset(
                 args.prompt_data,
                 tokenizer=tokenizer,
@@ -182,9 +187,9 @@ class Buffer:
             return
 
         if not evaluation and self.args.load_debug_rollout_data:
-            data = pickle.load(
+            data = torch.load(
                 open(self.args.load_debug_rollout_data.format(rollout_id=rollout_id), "rb"),
-            )
+            )["samples"]
             data = [Sample.from_dict(sample) for sample in data]
         else:
             generate_rollout = self.eval_generate_rollout if evaluation else self.generate_rollout
@@ -213,6 +218,7 @@ class Buffer:
             # we could use key to select the reward.
             "rewards": [sample.get_reward_value(self.args) for sample in samples],
             "truncated": [1 if sample.status == Sample.Status.TRUNCATED else 0 for sample in samples],
+            "sample_indices": [sample.index for sample in samples],
         }
 
         # loss mask
@@ -240,10 +246,17 @@ class Buffer:
     def _set_data(self, data: Union[list[Sample], Any], evaluation=False):
         data_pool = self.eval_data_pool if evaluation else self.train_data_pool
         if not evaluation:
-            if self.args.save_debug_rollout_data:
-                pickle.dump(
-                    [sample.to_dict() for sample in data],
-                    open(self.args.save_debug_rollout_data.format(rollout_id=self.rollout_id), "wb"),
+            # TODO extract to a function during refactor
+            if (path_template := self.args.save_debug_rollout_data) is not None:
+                path = Path(path_template.format(rollout_id=self.rollout_id))
+                print(f"Save debug rollout data to {path}")
+                path.parent.mkdir(parents=True, exist_ok=True)
+                torch.save(
+                    dict(
+                        rollout_id=self.rollout_id,
+                        samples=[sample.to_dict() for sample in data],
+                    ),
+                    path,
                 )
             data = self._convert_samples_to_train_data(data)
         data_pool[self.rollout_id] = data

@@ -662,6 +662,21 @@ def get_slime_extra_args_provider(add_custom_arguments=None):
                     "This is useful for debugging the rollout generation function."
                 ),
             )
+            parser.add_argument(
+                "--save-debug-train-data",
+                type=str,
+                default=None,
+                help=(
+                    "Save the train data to this path for debugging. "
+                    "The file will be saved to `save_debug_train_data.format(rollout_id)`."
+                ),
+            )
+            parser.add_argument(
+                "--dump-details",
+                type=str,
+                default=None,
+                help=("Dump all details of training for post-hoc analysis and visualization."),
+            )
             return parser
 
         def add_network_arguments(parser):
@@ -870,6 +885,10 @@ def parse_args(add_custom_arguments=None):
 
     if args.eval_reward_key is None:
         args.eval_reward_key = args.reward_key
+
+    if args.dump_details is not None:
+        args.save_debug_rollout_data = f"{args.dump_details}/rollout_data/{{rollout_id}}.pt"
+        args.save_debug_train_data = f"{args.dump_details}/train_data/{{rollout_id}}_{{rank}}.pt"
 
     if args.load_debug_rollout_data is not None:
         print(
