@@ -211,10 +211,7 @@ class Buffer:
             "response_lengths": [sample.response_length for sample in samples],
             # some reward model, e.g. remote rm, may return multiple rewards,
             # we could use key to select the reward.
-            "rewards": [
-                sample.reward if not self.args.reward_key else sample.rewards[self.args.reward_key]
-                for sample in samples
-            ],
+            "rewards": [sample.get_reward_value(self.args) for sample in samples],
             "truncated": [1 if sample.status == Sample.Status.TRUNCATED else 0 for sample in samples],
         }
 

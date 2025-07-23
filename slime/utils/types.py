@@ -39,6 +39,9 @@ class Sample:
         data["status"] = Sample.Status(data["status"])
         return Sample(**data)
 
+    def get_reward_value(self, args) -> float:
+        return self.reward if not args.reward_key else self.reward[args.reward_key]
+
 
 @dataclass
 class ParamInfo:
