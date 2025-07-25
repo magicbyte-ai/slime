@@ -1,4 +1,3 @@
-import copy
 import logging
 import os
 from pathlib import Path
@@ -6,12 +5,11 @@ from typing import Union
 
 import ray
 import torch
-from transformers import AutoTokenizer
 
 import wandb
-from slime.utils.data import Dataset
 from slime.utils.misc import load_function
 from slime.utils.types import Sample
+from slime.ray.rollout_data_source import RolloutDataSource
 from slime.utils.ray_utils import Box
 
 logging.getLogger("httpx").setLevel(logging.WARNING)
@@ -30,6 +28,8 @@ class Buffer:
     def __init__(self, args):
         self.args = args
 
+        self.data_source = RolloutDataSource(args)
+
         # a list of sample group.
         # each group has n_samples_per_prompt samples, all of them has the same prompt.
         self.buffer: list[list[Sample]] = []
@@ -38,34 +38,6 @@ class Buffer:
         else:
             self.buffer_filter = load_function(self.args.buffer_filter_path)
 
-        self.epoch_id = 0
-        self.sample_index = 0
-        self.sample_offset = 0
-        self.metadata = {}
-
-        if args.rollout_global_dataset:
-            tokenizer = AutoTokenizer.from_pretrained(args.hf_checkpoint, trust_remote_code=True)
-
-            # TODO move (during the refactor)
-            if (d := args.dump_details) is not None:
-                tokenizer.save_pretrained(Path(d) / "tokenizer")
-
-            self.dataset = Dataset(
-                args.prompt_data,
-                tokenizer=tokenizer,
-                max_length=args.rollout_max_prompt_len,
-                prompt_key=args.input_key,
-                label_key=args.label_key,
-                metadata_key=args.metadata_key,
-                tool_key=args.tool_key,
-                apply_chat_template=args.apply_chat_template,
-                seed=args.rollout_seed,
-            )
-            if self.args.rollout_shuffle:
-                self.dataset.shuffle(self.epoch_id)
-        else:
-            self.dataset = None
-
         self.generate_rollout = load_function(self.args.rollout_function_path)
         self.eval_generate_rollout = load_function(self.args.eval_function_path)
         print(f"import {self.args.rollout_function_path} as generate_rollout function.")
@@ -73,7 +45,7 @@ class Buffer:
 
     def get_num_rollout_per_epoch(self):
         assert self.args.rollout_global_dataset
-        return len(self.dataset) // self.args.rollout_batch_size
+        return len(self.data_source.dataset) // self.args.rollout_batch_size
 
     def update_wandb_run_id(self, run_id):
         """Update wandb run_id and initialize wandb"""
@@ -117,6 +89,7 @@ class Buffer:
 
         wandb.init(**wandb_config, settings=wandb.Settings(mode="shared"))
 
+    # TODO simplify remaining logic
     def get_samples(self, num_samples: int) -> list[list[Sample]]:
         """
         Return num_samples samples
@@ -128,36 +101,7 @@ class Buffer:
         if num_samples == 0:
             return samples
 
-        if self.dataset is not None:
-            if self.sample_offset + num_samples <= len(self.dataset):
-                prompt_samples = self.dataset.samples[self.sample_offset : self.sample_offset + num_samples]
-                self.sample_offset += num_samples
-            else:
-                prompt_samples = self.dataset.samples[self.sample_offset :]
-                num_samples -= len(prompt_samples)
-                self.epoch_id += 1
-                if self.args.rollout_shuffle:
-                    self.dataset.shuffle(self.epoch_id)
-                prompt_samples += self.dataset.samples[:num_samples]
-                self.sample_offset = num_samples
-            for prompt_sample in prompt_samples:
-                group = []
-                for _ in range(self.args.n_samples_per_prompt):
-                    sample = copy.deepcopy(prompt_sample)
-                    sample.index = self.sample_index
-                    self.sample_index += 1
-                    group.append(sample)
-                samples.append(group)
-        else:
-            for _ in range(num_samples):
-                group = []
-                for _ in range(self.args.n_samples_per_prompt):
-                    sample = Sample(
-                        index=self.sample_index,
-                    )
-                    self.sample_index += 1
-                    group.append(sample)
-                samples.append(group)
+        samples += self.data_source.get_samples(num_samples=num_samples)
         return samples
 
     def _get_samples_from_buffer(self, num_samples: int) -> list[list[Sample]]:
@@ -258,48 +202,19 @@ class Buffer:
             train_data["round_number"] = [sample.metadata["round_number"] for sample in samples]
         return train_data
 
+    # TODO remove
     def update_metadata(self, metadata: dict):
-        self.metadata.update(metadata)
+        self.data_source.metadata.update(metadata)
 
+    # TODO remove
     def get_metadata(self):
-        return self.metadata
+        return self.data_source.metadata
 
     def get_buffer_length(self):
         return len(self.buffer)
 
     def save(self, rollout_id):
-        if not self.args.rollout_global_dataset:
-            return
-
-        state_dict = {
-            "sample_offset": self.sample_offset,
-            "epoch_id": self.epoch_id,
-            "sample_index": self.sample_index,
-            "metadata": self.metadata,
-        }
-        path = os.path.join(self.args.save, f"rollout/global_dataset_state_dict_{rollout_id}.pt")
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        torch.save(state_dict, path)
+        self.data_source.save(rollout_id)
 
     def load(self, rollout_id=None):
-        if not self.args.rollout_global_dataset:
-            return
-
-        if self.args.load is None:
-            return
-
-        path = os.path.join(self.args.load, f"rollout/global_dataset_state_dict_{rollout_id}.pt")
-        if not os.path.exists(path):
-            print(f"Checkpoint {path} does not exist.")
-            return
-
-        print(f"load metadata from {path}")
-        print(f"load metadata: {self.metadata}")
-        state_dict = torch.load(path)
-        self.sample_offset = state_dict.get("sample_offset", 0)
-        self.epoch_id = state_dict.get("epoch_id", 0)
-        self.sample_index = state_dict.get("sample_index", 0)
-        self.metadata = state_dict.get("metadata", {})
-
-        if self.args.rollout_global_dataset and self.args.rollout_shuffle:
-            self.dataset.shuffle(self.epoch_id)
+        self.data_source.load(rollout_id)
