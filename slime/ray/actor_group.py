@@ -104,11 +104,9 @@ class RayTrainGroup:
     def get_rollout_data(self, rollout_id):
         ray.get([actor.get_rollout_data.remote(rollout_id) for actor in self._actor_handlers])
 
-    def async_train(self, rollout_id, with_data_fetching=True):
+    def async_train(self, rollout_id):
         """Do one rollout training"""
-        return [
-            actor.train.remote(rollout_id, with_data_fetching=with_data_fetching) for actor in self._actor_handlers
-        ]
+        return [actor.train.remote(rollout_id) for actor in self._actor_handlers]
 
     def async_eval(self, rollout_id):
         """Evaluate the model"""

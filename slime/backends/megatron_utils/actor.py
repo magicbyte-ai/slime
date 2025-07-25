@@ -180,15 +180,14 @@ class MegatronTrainRayActor(TrainRayActor):
                 rollout_data=rollout_data,
             )
 
-    def train(self, rollout_id, with_data_fetching=True):
+    def train(self, rollout_id):
         Timer().end("train_wait")
 
         rollout_data = {}
 
         if self.args.debug_rollout_only:
             # For debug rollout, we just log the data and return.
-            if with_data_fetching:
-                self.get_rollout_data(rollout_id, rollout_data)
+            self.get_rollout_data(rollout_id, rollout_data)
             log_rollout_data(rollout_id, self.args, rollout_data)
             log_perf_data(rollout_id, self.args)
             Timer().start("train_wait")
@@ -199,9 +198,7 @@ class MegatronTrainRayActor(TrainRayActor):
 
         with timer("train"):
             with timer("data_preprocess"):
-                # For async train, we need to separate the data fetching and training.
-                if with_data_fetching:
-                    self.get_rollout_data(rollout_id, rollout_data)
+                self.get_rollout_data(rollout_id, rollout_data)
 
                 # Create data iterator for log_probs and train.
                 (

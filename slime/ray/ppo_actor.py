@@ -64,7 +64,7 @@ class TrainRayActor(RayActor):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def train(self, rollout_id, with_data_fetching=True):
+    def train(self, rollout_id):
         raise NotImplementedError
 
     @abc.abstractmethod
