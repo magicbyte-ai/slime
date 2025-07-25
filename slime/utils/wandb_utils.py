@@ -48,6 +48,7 @@ def init_wandb_secondary(args, wandb_run_id):
 
     _init_wandb_common()
 
+    
 def _init_wandb_common():
     wandb.define_metric("train/step")
     wandb.define_metric("train/*", step_metric="train/step")
@@ -59,4 +60,3 @@ def _init_wandb_common():
     wandb.define_metric("eval/*", step_metric="eval/step")
     wandb.define_metric("perf/step")
     wandb.define_metric("perf/*", step_metric="rollout/step")
-
