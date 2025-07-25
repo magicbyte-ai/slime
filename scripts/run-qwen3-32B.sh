@@ -27,14 +27,14 @@ echo "HAS_NVLINK: $HAS_NVLINK (detected $NVLINK_COUNT NVLink references)"
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
 DATA_DIR="/workspace/data"
 MODEL_DIR="/workspace/models"
-source "${SCRIPT_DIR}/models/qwen3-8B.sh"
+source "${SCRIPT_DIR}/models/qwen3-32B.sh"
 
 CKPT_ARGS=(
-   --hf-checkpoint ${MODEL_DIR}/Qwen3-8B
-   #--hf-checkpoint /root/Qwen3-8B-FP8
-   --ref-load ${MODEL_DIR}/Qwen3-8B_torch_dist
-   --load ${MODEL_DIR}/Qwen3-8B_slime/
-   --save ${MODEL_DIR}/Qwen3-8B_slime/
+   --hf-checkpoint ${MODEL_DIR}/Qwen3-32B
+   #--hf-checkpoint /root/Qwen3-32B-FP8
+   --ref-load ${MODEL_DIR}/Qwen3-32B_torch_dist
+   --load ${MODEL_DIR}/Qwen3-32B_slime_2/
+   --save ${MODEL_DIR}/Qwen3-32B_slime_2/
    --save-interval 50
 )
 
@@ -48,47 +48,47 @@ ROLLOUT_ARGS=(
    --num-rollout 3000
    --rollout-batch-size 32
    --n-samples-per-prompt 8
-   --rollout-max-response-len 8192
+   --rollout-max-response-len 15000
    --rollout-temperature 0.8
 
    --over-sampling-batch-size 32
    --dynamic-sampling-filter-path slime.rollout.filter_hub.dynamic_sampling_filters.check_reward_nonzero_std
-   #--partial-rollout
 
    --global-batch-size 256
    --balance-data
 )
 
-# EVAL_ARGS=(
-#    --eval-interval 20
-#    --eval-prompt-data aime ${DATA_DIR}/aime-2024/aime-2024.jsonl
-#    --n-samples-per-eval-prompt 16
-#    --eval-max-response-len 16384
-#    --eval-top-p 0.95
-#    --eval-temperature 0.6
-# )
+EVAL_ARGS=(
+   --eval-interval 30
+   --eval-prompt-data aime ${DATA_DIR}/aime-2024/aime-2024.jsonl
+   --n-samples-per-eval-prompt 16
+   --eval-max-response-len 16384
+   --eval-top-p 0.95
+   --eval-temperature 0.6
+)
 
 PERF_ARGS=(
    --tensor-model-parallel-size 2
    --sequence-parallel
-   --pipeline-model-parallel-size 1
-   # --context-parallel-size 1
+   --pipeline-model-parallel-size 4
+
+   # --context-parallel-size [1
    # --expert-model-parallel-size 1
    # --expert-tensor-parallel-size 1
 
    --recompute-granularity full
    --recompute-method uniform
-   --recompute-num-layers 1
-   # --recompute-activations
+   --recompute-num-layers 8
+   # --recompute-activation[s
 
    # --micro-batch-size 1
    --use-dynamic-batch-size
-   --max-tokens-per-gpu 9216
+   --max-tokens-per-gpu 16384
 )
 
 GRPO_ARGS=(
    --advantage-estimator grpo
-   --use-kl-loss
+   # --use-kl-loss
    --kl-loss-coef 0.00
    --kl-loss-type low_var_kl
    --kl-coef 0.00
@@ -109,14 +109,13 @@ OPTIMIZER_ARGS=(
 WANDB_ARGS=(
    --use-wandb
    --wandb-project slime-dev
-   --wandb-group qwen3-8B-RL-test
+   --wandb-group qwen3-32B-RL-test
    --wandb-key ${WANDB_KEY}
 )
 
 SGLANG_ARGS=(
    --rollout-num-gpus-per-engine 2
    --sglang-mem-fraction-static 0.7
-   --sglang-server-concurrency 128
 )
 
 MISC_ARGS=(
@@ -163,4 +162,4 @@ ray job submit --address="http://127.0.0.1:8265" \
    ${PERF_ARGS[@]} \
    ${SGLANG_ARGS[@]} \
    ${MISC_ARGS[@]} \
-   # ${EVAL_ARGS[@]} \
+   # ${EVAL_ARGS[@]} 
