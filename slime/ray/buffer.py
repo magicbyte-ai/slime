@@ -5,7 +5,6 @@ from typing import Union
 import ray
 import torch
 
-import wandb
 from slime.utils.misc import load_function
 from slime.utils.types import Sample
 from slime.ray.rollout_data_source import RolloutDataSource
@@ -27,7 +26,7 @@ def pop_first(args, rollout_id, buffer: list[list[Sample]], num_samples: int) ->
 class Buffer:
     def __init__(self, args, wandb_run_id):
         self.args = args
-        init_wandb_secondary(wandb_run_id)
+        init_wandb_secondary(args, wandb_run_id)
 
         self.data_source = RolloutDataSource(args)
 

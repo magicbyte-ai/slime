@@ -144,15 +144,14 @@ class MegatronTrainRayActor(TrainRayActor):
     def set_data_buffer(self, data_buffer):
         self.data_buffer = data_buffer
 
-    def _get_rollout_data(self, rollout_data_ref, rollout_data):
+    def _get_rollout_data(self, rollout_data_ref):
         # Fetch data through ray on CPU, not sure if this will be performance bottleneck.
         # Both first pp stage and the last pp stage will recieve the data.
-        process_rollout_data(
+        return process_rollout_data(
             self.args,
             rollout_data_ref,
             mpu.get_data_parallel_rank(with_context_parallel=False),
             mpu.get_data_parallel_world_size(with_context_parallel=False),
-            rollout_data=rollout_data,
         )
 
     def compute_log_prob(
@@ -182,11 +181,9 @@ class MegatronTrainRayActor(TrainRayActor):
     def train(self, rollout_id, rollout_data_ref):
         Timer().end("train_wait")
 
-        rollout_data = {}
-
         if self.args.debug_rollout_only:
             # For debug rollout, we just log the data and return.
-            self._get_rollout_data(rollout_data_ref, rollout_data)
+            rollout_data = self._get_rollout_data(rollout_data_ref)
             log_rollout_data(rollout_id, self.args, rollout_data)
             log_perf_data(rollout_id, self.args)
             Timer().start("train_wait")
@@ -197,7 +194,7 @@ class MegatronTrainRayActor(TrainRayActor):
 
         with timer("train"):
             with timer("data_preprocess"):
-                self._get_rollout_data(rollout_data_ref, rollout_data)
+                rollout_data = self._get_rollout_data(rollout_data_ref)
 
                 # Create data iterator for log_probs and train.
                 (
