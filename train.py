@@ -43,16 +43,17 @@ def train(args):
     # train loop.
     # note that for async training, one can change the position of the sync operation(ray.get).
     for rollout_id in range(args.start_rollout_id, args.num_rollout):
+        # TODO extract the duplicated eval logic
         if args.eval_interval is not None and rollout_id == 0:
-            ray.get(rollout_generator.async_generate(rollout_id, evaluation=True))
-            ray.get(actor_model.async_eval(rollout_id))
+            eval_rollout_data_ref = ray.get(rollout_generator.async_generate(rollout_id, evaluation=True))
+            ray.get(actor_model.async_eval(rollout_id, eval_rollout_data_ref))
 
-        ray.get(rollout_generator.async_generate(rollout_id))
+        rollout_data_ref = ray.get(rollout_generator.async_generate(rollout_id))
 
         if args.offload:
             ray.get(rollout_generator.async_offload())
 
-        ray.get(actor_model.async_train(rollout_id))
+        ray.get(actor_model.async_train(rollout_id, rollout_data_ref))
 
         if args.save_interval is not None and (
             (rollout_id + 1) % args.save_interval == 0
@@ -72,8 +73,8 @@ def train(args):
             (rollout_id + 1) % args.eval_interval == 0
             or (num_rollout_per_epoch is not None and (rollout_id + 1) % num_rollout_per_epoch == 0)
         ):
-            ray.get(rollout_generator.async_generate(rollout_id, evaluation=True))
-            ray.get(actor_model.async_eval(rollout_id))
+            eval_rollout_data_ref = ray.get(rollout_generator.async_generate(rollout_id, evaluation=True))
+            ray.get(actor_model.async_eval(rollout_id, eval_rollout_data_ref))
 
 
 if __name__ == "__main__":

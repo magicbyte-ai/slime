@@ -63,11 +63,11 @@ def get_minimum_num_micro_batch_size(total_lengths, max_tokens_per_gpu, cp_size)
     return len(batches)
 
 
-def process_rollout_data(rollout_id, args, data_buffer, dp_rank, dp_size, rollout_data):
+def process_rollout_data(args, rollout_data_ref, dp_rank, dp_size, rollout_data):
     rank = dist.get_rank()
 
     if rank == 0:
-        data = ray.get(data_buffer.get_data.remote(rollout_id))
+        data = ray.get(rollout_data_ref.inner)
         dist.broadcast_object_list([data], src=0)
     else:
         data = [None]

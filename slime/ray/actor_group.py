@@ -104,13 +104,13 @@ class RayTrainGroup:
     def get_rollout_data(self, rollout_id):
         ray.get([actor.get_rollout_data.remote(rollout_id) for actor in self._actor_handlers])
 
-    def async_train(self, rollout_id):
+    def async_train(self, rollout_id, rollout_data_ref):
         """Do one rollout training"""
-        return [actor.train.remote(rollout_id) for actor in self._actor_handlers]
+        return [actor.train.remote(rollout_id, rollout_data_ref) for actor in self._actor_handlers]
 
-    def async_eval(self, rollout_id):
+    def async_eval(self, rollout_id, rollout_data_ref):
         """Evaluate the model"""
-        return [actor.eval.remote(rollout_id) for actor in self._actor_handlers]
+        return [actor.eval.remote(rollout_id, rollout_data_ref) for actor in self._actor_handlers]
 
     def async_save_model(self, step_id):
         """Save actor model on rank 0."""

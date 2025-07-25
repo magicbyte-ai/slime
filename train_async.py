@@ -40,16 +40,17 @@ def train(args):
     ray.get(actor_model.async_update_weights())
 
     # async train loop.
-    generation_handles = rollout_generator.async_generate(args.start_rollout_id)
+    rollout_data_next_future = rollout_generator.async_generate(args.start_rollout_id)
     for rollout_id in range(args.start_rollout_id, args.num_rollout):
         # Sync the last generation
-        ray.get(generation_handles)
+        if rollout_data_next_future is not None:
+            rollout_data_curr_ref = ray.get(rollout_data_next_future)
 
         # Start the next rollout early.
         if rollout_id + 1 < args.num_rollout:
-            generation_handles = rollout_generator.async_generate(rollout_id + 1)
+            rollout_data_next_future = rollout_generator.async_generate(rollout_id + 1)
 
-        ray.get(actor_model.async_train(rollout_id))
+        ray.get(actor_model.async_train(rollout_id, rollout_data_curr_ref))
 
         if args.save_interval is not None and (
             (rollout_id + 1) % args.save_interval == 0
@@ -61,15 +62,16 @@ def train(args):
 
         if (rollout_id + 1) % args.update_weights_interval == 0:
             # sync generate before update weights to prevent update weight in the middle of generation
-            ray.get(generation_handles)
+            rollout_data_curr_ref = ray.get(rollout_data_next_future)
+            rollout_data_next_future = None
             ray.get(actor_model.async_update_weights())
 
         if args.eval_interval is not None and (
             (rollout_id + 1) % args.eval_interval == 0
             or (num_rollout_per_epoch is not None and (rollout_id + 1) % num_rollout_per_epoch == 0)
         ):
-            ray.get(rollout_generator.async_generate(rollout_id, evaluation=True))
-            ray.get(actor_model.async_eval(rollout_id))
+            eval_rollout_data_ref = ray.get(rollout_generator.async_generate(rollout_id, evaluation=True))
+            ray.get(actor_model.async_eval(rollout_id, eval_rollout_data_ref))
 
 
 if __name__ == "__main__":
