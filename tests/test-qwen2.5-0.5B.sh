@@ -12,44 +12,46 @@ pkill -9 python
 
 set -ex
 
+
+huggingface-cli download --repo-type zhuzilin/gsm8k --local-dir gsm8k
+
+
 # will prevent ray from buffering stdout/stderr
 export PYTHONBUFFERED=16
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
-source "${SCRIPT_DIR}/../scripts/models/qwen3-0.6B.sh"
+source "${SCRIPT_DIR}/../scripts/models/qwen2.5-0.5B.sh"
 
 CKPT_ARGS=(
-   --hf-checkpoint /root/Qwen3-0.6B
-   --ref-load /root/Qwen3-0.6B_torch_dist
+   --hf-checkpoint /root/Qwen2.5-0.5B-Instruct/
+   --ref-load /root/Qwen2.5-0.5B-Instruct_torch_dist/
 )
 
 ROLLOUT_ARGS=(
-   --prompt-data /root/dapo-math-17k/dapo-math-17k.jsonl
-   --input-key prompt
+   --prompt-data gsm8k/train.parquet
+   --input-key messages
    --label-key label
    --apply-chat-template
    --rollout-shuffle
-   --rm-type deepscaler
+   --rm-type math
    --num-rollout 3000
    --rollout-batch-size 32
    --n-samples-per-prompt 8
-   --rollout-max-response-len 8192
+   --rollout-max-response-len 1024
    --rollout-temperature 0.8
 
    --over-sampling-batch-size 64
    --dynamic-sampling-filter-path slime.rollout.filter_hub.dynamic_sampling_filters.check_reward_nonzero_std
-   #--partial-rollout
 
    --global-batch-size 256
-   #--balance-data
 )
 
 EVAL_ARGS=(
    --eval-interval 20
-   --eval-prompt-data aime /root/aime-2024/aime-2024.jsonl
+   --eval-prompt-data gsm8k gsm8k/test.parquet
    --n-samples-per-eval-prompt 1
-   --eval-max-response-len 16384
-   --eval-temperature 0
+   --eval-max-response-len 1024
+   --eval-top-k 1
 )
 
 PERF_ARGS=(
@@ -86,9 +88,9 @@ OPTIMIZER_ARGS=(
 )
 
 WANDB_ARGS=(
-   #--use-wandb
+   --use-wandb
    --wandb-project slime-test
-   --wandb-group test-qwen-3-0.6B
+   --wandb-group test-qwen2.5-0.5B-gsm8k
 )
 
 SGLANG_ARGS=(
@@ -114,12 +116,12 @@ ray job submit --address="http://127.0.0.1:8265" \
    --runtime-env-json='{
      "env_vars": {
         "PYTHONPATH": "/root/Megatron-LM",
-        "CUDA_DEVICE_MAX_CONNECTIONS": "1"
+        "CUDA_DEVICE_MAX_CONNECTIONS": "1",
      }
    }' \
    -- python3 train.py \
    --actor-num-nodes 1 \
-   --actor-num-gpus-per-node 1 \
+   --actor-num-gpus-per-node 8 \
    --colocate \
    ${MODEL_ARGS[@]} \
    ${CKPT_ARGS[@]} \
