@@ -39,6 +39,7 @@ ROLLOUT_ARGS=(
    --n-samples-per-prompt 8
    --rollout-max-response-len 1024
    --rollout-temperature 0.8
+   --rollout-num-gpus 2
 
    --over-sampling-batch-size 64
    --dynamic-sampling-filter-path slime.rollout.filter_hub.dynamic_sampling_filters.check_reward_nonzero_std
@@ -119,10 +120,9 @@ ray job submit --address="http://127.0.0.1:8265" \
         "CUDA_DEVICE_MAX_CONNECTIONS": "1"
      }
    }' \
-   -- python3 train.py \
+   -- python3 train_async.py \
    --actor-num-nodes 1 \
-   --actor-num-gpus-per-node 4 \
-   --colocate \
+   --actor-num-gpus-per-node 2 \
    ${MODEL_ARGS[@]} \
    ${CKPT_ARGS[@]} \
    ${ROLLOUT_ARGS[@]} \
