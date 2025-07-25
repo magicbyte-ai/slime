@@ -27,7 +27,7 @@ class TrainRayActor(RayActor):
         # os.environ["LOCAL_RANK"] = str(ray.get_gpu_ids()[0])
         os.environ["LOCAL_RANK"] = str(ray.get_gpu_ids()[0])
 
-    def init(self, args, role, with_ref=False):
+    def init(self, args, role, wandb_run_id, with_ref=False):
         self.args = args
         self.role = role
         self.with_ref = with_ref
