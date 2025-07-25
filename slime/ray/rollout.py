@@ -152,10 +152,41 @@ def create_rollout_engines(args, pg):
     return rollout_engines
 
 
-class RolloutGroup:
+def _start_router(args):
+    if args.sglang_router_ip is not None:
+        return
+
+    from sglang_router.launch_router import RouterArgs
+
+    args.sglang_router_ip = get_host_info()[1]
+    args.sglang_router_port = find_available_port(random.randint(3000, 4000))
+
+    router_args = RouterArgs(
+        host=args.sglang_router_ip,
+        port=args.sglang_router_port,
+        balance_abs_threshold=0,
+    )
+
+    if hasattr(router_args, "log_level"):
+        router_args.log_level = "warn"
+
+    process = multiprocessing.Process(
+        target=run_router,
+        args=(router_args,),
+    )
+    process.daemon = True  # Set the process as a daemon
+    process.start()
+    # Wait 3 seconds
+    time.sleep(3)
+    assert process.is_alive()
+    # If router ip is specified, use the specified launched router
+    print(f"SGLang router launched at {args.sglang_router_ip}:{args.sglang_router_port}")
+
+
+class RolloutManager:
     def __init__(self, args, pg):
         self.args = args
-        self.start_router()
+        _start_router(args)
         self.data_buffer = Buffer.options(
             num_cpus=1,
             num_gpus=0,
@@ -169,36 +200,6 @@ class RolloutGroup:
             num_cpus=1,
             num_gpus=0,
         ).remote()
-
-    def start_router(self):
-        if self.args.sglang_router_ip is not None:
-            return
-
-        from sglang_router.launch_router import RouterArgs
-
-        self.args.sglang_router_ip = get_host_info()[1]
-        self.args.sglang_router_port = find_available_port(random.randint(3000, 4000))
-
-        router_args = RouterArgs(
-            host=self.args.sglang_router_ip,
-            port=self.args.sglang_router_port,
-            balance_abs_threshold=0,
-        )
-
-        if hasattr(router_args, "log_level"):
-            router_args.log_level = "warn"
-
-        process = multiprocessing.Process(
-            target=run_router,
-            args=(router_args,),
-        )
-        process.daemon = True  # Set the process as a daemon
-        process.start()
-        # Wait 3 seconds
-        time.sleep(3)
-        assert process.is_alive()
-        # If router ip is specified, use the specified launched router
-        print(f"SGLang router launched at {self.args.sglang_router_ip}:{self.args.sglang_router_port}")
 
     def async_generate(self, rollout_id, evaluation=False):
         return self.data_buffer.generate.remote(rollout_id, evaluation=evaluation)

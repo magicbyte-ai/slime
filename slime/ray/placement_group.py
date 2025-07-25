@@ -4,7 +4,7 @@ from ray.util.placement_group import placement_group
 from ray.util.scheduling_strategies import PlacementGroupSchedulingStrategy
 
 from .actor_group import RayTrainGroup
-from .rollout import RolloutGroup
+from .rollout import RolloutManager
 
 
 @ray.remote(num_gpus=1)
@@ -114,5 +114,5 @@ def create_actor_group(args, pg):
     return actor_model
 
 
-def create_rollout_group(args, pg):
-    return RolloutGroup(args, pg)
+def create_rollout_manager(args, pg):
+    return RolloutManager(args, pg)
