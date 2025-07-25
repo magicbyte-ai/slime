@@ -63,7 +63,7 @@ def create_rollout_engines(args, pg):
     if args.debug_train_only:
         return []
 
-    num_gpu_per_engine = min(args.rollout_num_gpus_per_engine, 8)
+    num_gpu_per_engine = min(args.rollout_num_gpus_per_engine, args.rollout_num_gpus_per_node)
     num_engines = args.rollout_num_gpus // num_gpu_per_engine
 
     pg, reordered_bundle_indices = pg
@@ -93,7 +93,9 @@ def create_rollout_engines(args, pg):
     # 2. nccl port
     # 3. dist_init_addr port
     # 4. other ports for dp_attention, which is of size 4 + dp_size
-    num_engines_per_node = max(1, min(8, args.rollout_num_gpus) // args.rollout_num_gpus_per_engine)
+    num_engines_per_node = max(
+        1, min(args.rollout_num_gpus_per_node, args.rollout_num_gpus) // args.rollout_num_gpus_per_engine
+    )
     addr_and_ports = [{} for _ in range(num_engines)]
     for rank, engine in enumerate(rollout_engines):
         if rank % num_engines_per_node != 0:
@@ -126,8 +128,8 @@ def create_rollout_engines(args, pg):
             addr_and_ports[rank + i]["port"] = get_port()
             addr_and_ports[rank + i]["nccl_port"] = get_port()
 
-        if args.rollout_num_gpus_per_engine > 8:
-            num_node_per_engine = args.rollout_num_gpus_per_engine // 8
+        if args.rollout_num_gpus_per_engine > args.rollout_num_gpus_per_node:
+            num_node_per_engine = args.rollout_num_gpus_per_engine // args.rollout_num_gpus_per_node
             if rank % num_node_per_engine == 0:
                 # this is the first node in the engine, we need to allocate the dist_init_addr port
                 dist_init_addr = f"{get_addr()}:{get_port(6 + args.sglang_dp_size)}"
@@ -160,7 +162,7 @@ class RolloutGroup:
         ).remote(args)
 
         self.all_rollout_engines = create_rollout_engines(args, pg)
-        nodes_per_engine = max(1, args.rollout_num_gpus_per_engine // 8)
+        nodes_per_engine = max(1, args.rollout_num_gpus_per_engine // args.rollout_num_gpus_per_node)
         # when doing multi-node serving, we will only send request to node-0 for each engine.
         self.rollout_engines = self.all_rollout_engines[::nodes_per_engine]
         self.rollout_engine_lock = Lock.options(
