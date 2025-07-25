@@ -1,4 +1,4 @@
-# Example: Qwen3-30B-A3B Model
+# Example: Qwen3-30B-A3B
 
 [中文版](../../zh/models/qwen3-30B-A3B.md)
 

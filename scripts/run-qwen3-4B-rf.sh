@@ -81,8 +81,7 @@ GRPO_ARGS=(
    --advantage-estimator reinforce_plus_plus
    --use-kl-loss
    --kl-loss-coef 0.00
-   --kl-loss-type low_var_kl
-   --kl-coef 0.005
+   --kl-loss-type low_var_kl5
    --entropy-coef 0.00
    --eps-clip 0.2
    --eps-clip-high 0.28

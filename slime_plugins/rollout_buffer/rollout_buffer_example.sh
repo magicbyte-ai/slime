@@ -86,7 +86,6 @@ GRPO_ARGS=(
    --use-kl-loss
    --kl-loss-coef 0.001
    --kl-loss-type low_var_kl
-   --kl-coef 0.00
    --entropy-coef 0.00
 )
 

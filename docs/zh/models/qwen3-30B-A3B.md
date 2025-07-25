@@ -1,10 +1,10 @@
-# 示例：Qwen3-30B-A3B 模型
+# 示例：Qwen3-30B-A3B
 
 [English](../../en/models/qwen3-30B-A3B.md)
 
 ## 环境准备
 
-搭建环境、下载模型、数据与 ckpt 转换均与 Qwen3-4B 模型相同，可以参考 [示例：Qwen3-4B 模型](./qwen3-4B.md)，将文中 Qwen3-4B 的部分转换为 Qwen3-30B-A3B 即可。
+搭建环境、下载模型、数据与 ckpt 转换均与 Qwen3-4B 模型相同，可以参考 [示例：Qwen3-4B](./qwen3-4B.md)，将文中 Qwen3-4B 的部分转换为 Qwen3-30B-A3B 即可。
 
 ⚠️ 在做 MoE 模型的 ckpt 转换时，请使用 [Pai-Megatron-Patch](https://github.com/alibaba/Pai-Megatron-Patch)，mbridge 可能会遇到加载问题。
 

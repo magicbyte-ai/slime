@@ -44,9 +44,7 @@ ROLLOUT_ARGS=(
    --label-key label
    --apply-chat-template
    --rollout-shuffle
-
    --rm-type deepscaler
-
    --num-rollout 3000
    --rollout-batch-size 32
    --n-samples-per-prompt 8
@@ -84,10 +82,9 @@ PERF_ARGS=(
 
 GRPO_ARGS=(
    --advantage-estimator grpo
-   # --use-kl-loss
-   # --kl-loss-coef 0.00
-   # --kl-loss-type low_var_kl
-   # --kl-coef 0.00
+   --use-kl-loss
+   --kl-loss-coef 0.00
+   --kl-loss-type low_var_kl
    --entropy-coef 0.00
    --eps-clip 0.2
    --eps-clip-high 0.28
@@ -107,10 +104,10 @@ OPTIMIZER_ARGS=(
 )
 
 WANDB_ARGS=(
-   --use-wandb
-   --wandb-project slime-dev
-   --wandb-group qwen3-4B-test
-   --wandb-key ${WANDB_KEY}
+   #--use-wandb
+   # --wandb-project slime-dev
+   # --wandb-group qwen3-30B-A3B-test
+   # --wandb-key ${WANDB_KEY}
 )
 
 SGLANG_ARGS=(

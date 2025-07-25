@@ -1,4 +1,4 @@
-# Example: GLM4-9B Model
+# Example: GLM4-9B
 
 [中文版](../../zh/models/glm4-9B.md)
 
@@ -59,6 +59,14 @@ source "${SCRIPT_DIR}/models/glm4-9B.sh"
 ```
 
 Reads the model's config from [scripts/models/glm4-9B.sh](../../../scripts/models/glm4-9B.sh). These configs are all Megatron parameters. When training with Megatron, it cannot read the model config from the checkpoint, so we need to configure it ourselves. We provide some examples in [scripts/models](../../../scripts/models/).
+
+⚠️  Ensure that settings such as `--rotary-base` in the model configuration file match the settings of the model you are currently training. This is because different models, even with the same architecture, might use different values. If needed, you can override these parameters in your script after loading the model weights. For instance:
+
+```bash
+source "${SCRIPT_DIR}/models/glm4-9B.sh"
+
+MODEL_ARGS += ( --rotary-base 10000 )
+```
 
 #### CKPT\_ARGS
 
@@ -156,7 +164,7 @@ PERF_ARGS=(
 
 #### GRPO\_ARGS
 
-Currently, slime only supports GRPO. Here are some GRPO-related parameters:
+Here are some GRPO-related parameters:
 
 ```bash
 GRPO_ARGS=(
@@ -164,8 +172,6 @@ GRPO_ARGS=(
    --use-kl-loss
    --kl-loss-coef 0.00
    --kl-loss-type low_var_kl
-   # Currently unused
-   --kl-coef 0.00
    --entropy-coef 0.00
    --eps-clip 0.2
    --eps-clip-high 0.28

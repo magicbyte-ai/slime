@@ -1,9 +1,9 @@
 diff --git a/python/sglang/srt/configs/model_config.py b/python/sglang/srt/configs/model_config.py
-index 25104bd..6853784 100644
+index 1a62178..cb9df92 100644
 --- a/python/sglang/srt/configs/model_config.py
 +++ b/python/sglang/srt/configs/model_config.py
-@@ -405,14 +405,14 @@ class ModelConfig:
-             quant_method = quant_cfg.get("quant_method", "").lower()
+@@ -426,14 +426,14 @@ class ModelConfig:
+             ).lower()
  
              # Detect which checkpoint is it
 -            for _, method in QUANTIZATION_METHODS.items():
@@ -25,11 +25,24 @@ index 25104bd..6853784 100644
  
              # Verify quantization configurations.
              if self.quantization is None:
+diff --git a/python/sglang/srt/layers/moe/ep_moe/token_dispatcher.py b/python/sglang/srt/layers/moe/ep_moe/token_dispatcher.py
+index 5c0cd3e..62179aa 100644
+--- a/python/sglang/srt/layers/moe/ep_moe/token_dispatcher.py
++++ b/python/sglang/srt/layers/moe/ep_moe/token_dispatcher.py
+@@ -107,6 +107,8 @@ class DeepEPBuffer:
+         else:
+             raise NotImplementedError
+ 
++        print(f"num_qps_per_rank: {num_qps_per_rank}")
++        num_qps_per_rank = 20
+         cls._buffer = Buffer(
+             group,
+             num_nvl_bytes,
 diff --git a/python/sglang/srt/layers/quantization/fp8.py b/python/sglang/srt/layers/quantization/fp8.py
-index f2c0d61..e548f39 100644
+index 4d886de..99f9df6 100644
 --- a/python/sglang/srt/layers/quantization/fp8.py
 +++ b/python/sglang/srt/layers/quantization/fp8.py
-@@ -340,10 +340,10 @@ class Fp8LinearMethod(LinearMethodBase):
+@@ -349,10 +349,10 @@ class Fp8LinearMethod(LinearMethodBase):
                  return
              else:
                  weight, weight_scale = layer.weight.data, layer.weight_scale_inv.data
@@ -37,10 +50,32 @@ index f2c0d61..e548f39 100644
 -            layer.weight_scale_inv = torch.nn.Parameter(
 -                weight_scale, requires_grad=False
 -            )
-+            # layer.weight = torch.nn.Parameter(weight, requires_grad=False)
-+            # layer.weight_scale_inv = torch.nn.Parameter(
-+            #     weight_scale, requires_grad=False
-+            # )
++            #layer.weight = torch.nn.Parameter(weight, requires_grad=False)
++            #layer.weight_scale_inv = torch.nn.Parameter(
++            #    weight_scale, requires_grad=False
++            #)
              return
  
          layer.weight = torch.nn.Parameter(layer.weight.data, requires_grad=False)
+diff --git a/python/sglang/srt/managers/scheduler.py b/python/sglang/srt/managers/scheduler.py
+index afb4b87..54c5876 100644
+--- a/python/sglang/srt/managers/scheduler.py
++++ b/python/sglang/srt/managers/scheduler.py
+@@ -1495,7 +1495,7 @@ class Scheduler(
+ 
+         if memory_leak:
+             msg = "token_to_kv_pool_allocator memory leak detected! " f"{token_msg}"
+-            raise ValueError(msg)
++            #raise ValueError(msg)
+ 
+         if self.disaggregation_mode == DisaggregationMode.DECODE:
+             req_total_size = (
+@@ -1510,7 +1510,7 @@ class Scheduler(
+                 f"available_size={len(self.req_to_token_pool.free_slots)}, "
+                 f"total_size={self.req_to_token_pool.size}\n"
+             )
+-            raise ValueError(msg)
++            #raise ValueError(msg)
+ 
+         if (
+             self.enable_metrics

@@ -1,4 +1,4 @@
-# 示例：Qwen3-4B 模型
+# 示例：Qwen3-4B
 
 [English](../../en/models/qwen3-4B.md)
 
@@ -58,6 +58,14 @@ source "${SCRIPT_DIR}/models/qwen3-4B.sh"
 ```
 
 从 [scripts/models/qwen3-4B.sh](../../../scripts/models/qwen3-4B.sh) 读取模型的 config。这些 config 都是 megatron 的参数。在使用 megatron 进行训练的时候，megatron 无法从 ckpt 中读取模型 config，需要我们自行配置。我们在 [scripts/models](../../../scripts/models/) 中提供了一些样例。
+
+⚠️  注意检查模型文件中的 `--rotary-base` 等配置是否对应你当前训练模型的配置，因为同一个模型结构的不同模型可能有不同的取值。在这种情况下，你可以在导入模型参数后在脚本里进行覆盖，例如：
+
+```bash
+source "${SCRIPT_DIR}/models/qwen3-4B.sh"
+
+MODEL_ARGS += ( --rotary-base 10000 )
+```
 
 #### CKPT_ARGS
 
@@ -155,7 +163,7 @@ PERF_ARGS=(
 
 #### GRPO_ARGS
 
-目前 slime 只支持 GRPO，这是一些 grpo 相关的参数：
+目前 slime 这是一些 grpo 相关的参数：
 
 ```bash
 GRPO_ARGS=(
@@ -163,8 +171,6 @@ GRPO_ARGS=(
    --use-kl-loss
    --kl-loss-coef 0.00
    --kl-loss-type low_var_kl
-   # 目前无用
-   --kl-coef 0.00
    --entropy-coef 0.00
    --eps-clip 0.2
    --eps-clip-high 0.28

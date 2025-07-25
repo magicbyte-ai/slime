@@ -14,7 +14,7 @@
       - [Environment Setup](#environment-setup)
       - [Examples](#examples)
         - [Dense Model Examples: GLM-4-9B and Qwen3-4B](#Dense-Model-Examples-GLM-4-9B-and-Qwen3-4B)
-        - [MoE Model Example: Qwen3-30B-A3B](#MoE-Model-Example-Qwen3-30B-A3B)
+        - [MoE Model Example: Qwen3-30B-A3B and DeepSeek-R1](#MoE-Model-Example-Qwen3-30B-A3B-and-DeepSeek-R1)
         - [Multi-Turn + Tool Calling Example: Search-R1 lite](#Multi-Turn--Tool-Calling-Example-Search-R1-lite)
         - [SFT Example: Qwen3-4B-Base with OpenHermes-2.5](#SFT-Example-Qwen3-4B-Base-with-OpenHermes-25)
   - [Checkpoint Format Conversion](#checkpoint-format-conversion)
@@ -58,14 +58,15 @@ pip install -e .
 
 We provide examples to use [GLM-4-9B](https://huggingface.co/THUDM/GLM-Z1-9B-0414) and [Qwen3-4B](https://huggingface.co/Qwen/Qwen3-4B), please refer to:
 
-- [Example: GLM-4-9B Model](docs/en/models/glm4-9B.md).
-- [Example: Qwen3-4B Model](docs/en/models/qwen3-4B.md).
+- [Example: GLM-4-9B](docs/en/models/glm4-9B.md).
+- [Example: Qwen3-4B](docs/en/models/qwen3-4B.md).
 
-#### MoE Model Example: Qwen3-30B-A3B
+#### MoE Model Example: Qwen3-30B-A3B and DeepSeek-R1
 
 For MoE example, please refer to:
 
-- [Example: Qwen3-30B-A3B Model](docs/en/models/qwen3-30B-A3B.md).
+- [Example: Qwen3-30B-A3B](docs/en/models/qwen3-30B-A3B.md).
+- [Example: Training DeepSeek R1 with 128xH100](docs/en/models/deepseek-r1.md)
 
 #### Multi-Turn + Tool Calling Example: Search-R1 lite
 

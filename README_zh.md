@@ -14,7 +14,7 @@
   - [环境准备](#环境准备)
   - [示例](#示例)
     - [Dense 模型示例：GLM-4-9B 与 Qwen3-4B](#Dense-模型示例GLM-4-9B-与-Qwen3-4B)
-    - [MoE 模型示例：Qwen3-30B-A3B](#MoE-模型示例Qwen3-30B-A3B)
+    - [MoE 模型示例：Qwen3-30B-A3B 与 DeepSeek-R1](#MoE-模型示例Qwen3-30B-A3B-与-DeepSeek-R1)
     - [多轮对话 + 工具调用示例：Search-R1 lite](#多轮对话--工具调用示例Search-R1-lite)
     - [SFT 示例：Qwen3-4B-Base + OpenHermes-2.5](#SFT-示例Qwen3-4B-Base--OpenHermes-25)
 - [Checkpoint 格式转换](#checkpoint-格式转换)
@@ -58,14 +58,15 @@ pip install -e .
 
 我们提供了 [GLM-4-9B](https://huggingface.co/THUDM/GLM-Z1-9B-0414) 和 [Qwen3-4B](https://huggingface.co/Qwen/Qwen3-4B) 的使用示例，可以通过他们对 slime 的使用方法有个基本的了解：
 
-- [示例：GLM-4-9B 模型](docs/zh/models/glm4-9B.md)
-- [示例：Qwen3-4B 模型](docs/zh/models/qwen3-4B.md)
+- [示例：GLM-4-9B](docs/zh/models/glm4-9B.md)
+- [示例：Qwen3-4B](docs/zh/models/qwen3-4B.md)
 
-#### MoE 模型示例：Qwen3-30B-A3B
+#### MoE 模型示例：Qwen3-30B-A3B 与 DeepSeek-R1
 
 我们也提供了 MoE 模型的示例，请查看：
 
-- [示例：Qwen3-30B-A3B 模型](docs/zh/models/qwen3-30B-A3B.md)
+- [示例：Qwen3-30B-A3B](docs/zh/models/qwen3-30B-A3B.md)
+- [示例：128xH100 训练 DeepSeek-R1](docs/zh/models/deepseek-r1.md)
 
 #### 多轮对话 + 工具调用示例：Search-R1 lite
 
