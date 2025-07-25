@@ -1,5 +1,7 @@
 # Example: Training DeepSeek R1 with 128xH100
 
+[中文版](../../zh/models/deepseek-r1.md)
+
 This is an example of doing DeepSeek R1 RL training using 128xH100 GPUs.
 
 We will use bf16 for training, and an fp8 format with 128x128 blockwise quantization for inference. The maximum response length is 32k, and dynamic sampling will be used to filter data during training.
