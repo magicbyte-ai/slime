@@ -174,7 +174,7 @@ def log_rollout_data(rollout_id, args, rollout_data):
         log_dict = {}
         response_lengths = rollout_data["response_lengths"]
         for key, val in rollout_data.items():
-            if key == "tokens" or key == "loss_masks":
+            if key == "tokens" or key == "loss_masks" or key == "sample_indices":
                 continue
             # Upload per sample mean for each rollout value
             # There are the following assumptions:

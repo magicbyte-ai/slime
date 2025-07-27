@@ -214,7 +214,7 @@ async def generate_rollout_async(
         print(f"start rollout id: {rollout_id}")
         START_ROLLOUT = False
 
-    data_number_to_fetch = (args.rollout_batch_size - data_buffer.get_buffer_length()) * args.n_samples_per_prompt
+    data_number_to_fetch = args.rollout_batch_size * args.n_samples_per_prompt - data_buffer.get_buffer_length()
     if data_number_to_fetch <= 0:
         print(
             f"❕buffer length: {data_buffer.get_buffer_length()}, buffer has enough data, return {args.rollout_batch_size} prompts"
@@ -285,7 +285,7 @@ async def generate_rollout_async(
                     else Sample.Status.TRUNCATED
                 ),
                 loss_mask=loss_mask,
-                metadata={**record["extra_info"], "raw_reward": record["raw_reward"]},
+                metadata={**record["extra_info"]},
             )
         )
     final_return_results = []

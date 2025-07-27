@@ -12,7 +12,6 @@ import requests
 from openai import OpenAI
 from tqdm import tqdm
 from slime.rollout.rm_hub import get_deepscaler_rule_based_reward
-from slime.rollout.rm_hub import get_deepscaler_rule_based_reward
 
 TASK_TYPE = "math"
 
@@ -349,4 +348,4 @@ def is_valid_group(group, min_valid_group_size, task_type="math"):
 
     is_valid = is_finished and valid_count >= min_valid_group_size
 
-    return is_valid, is_finished
+    return is_valid

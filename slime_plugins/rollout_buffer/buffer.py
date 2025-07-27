@@ -15,7 +15,8 @@ app = FastAPI(title="Rollout Buffer Server", debug=True)
 
 
 def default_is_valid_group(group_data, min_valid_group_size, task_type):
-    return group_data >= min_valid_group_size
+    instance_id, samples = group_data
+    return len(samples) >= min_valid_group_size
 
 
 def default_get_group_data_meta_info(temp_data: Dict[str, List[Dict[str, Any]]]) -> Dict[str, Any]:
@@ -165,7 +166,7 @@ class BufferQueue:
         finished_groups = []
 
         for instance_id, group_data in self.data.items():
-            if self.is_valid_group_func((instance_id, group_data), self.min_valid_group_size, self.task_type):
+            if self.is_valid_group_func((instance_id, group_data), self.group_size, self.task_type):
                 valid_groups[instance_id] = group_data
 
         # Remove finished groups and timed out groups with insufficient data
@@ -216,8 +217,6 @@ class RolloutBuffer:
     def __init__(
         self,
         group_size=16,
-        min_valid_group_size_ratio=1,
-        min_valid_item_size_ratio=1,
         task_type="math",
         transform_group_func=None,
         is_valid_group_func=None,
@@ -225,8 +224,6 @@ class RolloutBuffer:
     ):
         self.buffer = BufferQueue(
             group_size=group_size,
-            min_valid_group_size_ratio=min_valid_group_size_ratio,
-            min_valid_item_size_ratio=min_valid_item_size_ratio,
             task_type=task_type,
             transform_group_func=transform_group_func,
             is_valid_group_func=is_valid_group_func,
@@ -239,10 +236,10 @@ class RolloutBuffer:
         self.task_type = task_type
 
     def write(self, data):
-        self.buffer.append(data)
-        self.total_written += 1
-
-        self.not_empty.notify_all()
+        with self.lock:
+            self.buffer.append(data)
+            self.total_written += 1
+            self.not_empty.notify_all()
         return data
 
     def read(self):
@@ -256,7 +253,7 @@ class RolloutBuffer:
             return result
 
 
-buffer = None
+buffer = RolloutBuffer()
 
 
 @app.post("/buffer/write", response_model=BufferResponse)
