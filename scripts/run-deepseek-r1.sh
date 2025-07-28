@@ -154,31 +154,9 @@ ray job submit --address="http://127.0.0.1:8265" \
    --runtime-env-json='{
      "env_vars": {
         "no_proxy": "localhost,127.0.0.1,0.0.0.0,${MASTER_ADDR}",
-        "GLOO_SOCKET_IFNAME": "${MLP_SOCKET_IFNAME}",
-        "TP_SOCKET_IFNAME": "${MLP_SOCKET_IFNAME}",
-        "MASTER_ADDR": "${MLP_WORKER_0_HOST}",
+        "MASTER_ADDR": "${MASTER_ADDR}",
         "PYTHONPATH": "/root/Megatron-LM/",
-        "NCCL_CUMEM_ENABLE": "0",
         "CUDA_DEVICE_MAX_CONNECTIONS": "1",
-        "NVTE_BWD_LAYERNORM_SM_MARGIN": "20",
-        "NCCL_IB_TC": "160",
-        "NCCL_PXN_DISABLE": "0",
-        "NCCL_IB_GID_INDEX": "3",
-        "NCCL_NET_GDR_LEVEL": "4",
-        "NCCL_IB_RETRY_CNT": "7",
-        "NCCL_IB_TIMEOUT": "32",
-        "NCCL_IB_QPS_PER_CONNECTION": "8",
-        "NCCL_P2P_LEVEL": "NVL",
-        "TORCH_NCCL_AVOID_RECORD_STREAMS": "1",
-        "NCCL_NVLS_ENABLE": "0",
-        "NCCL_MIN_CTAS": "4",
-        "OMPI_MCA_pml": "ob1",
-        "OMPI_MCA_btl": "^openib",
-        "OMPI_MCA_routed": "direct",
-        "OMPI_MCA_routed_radix": "1024",
-        "OMPI_MCA_plm_rsh_no_tree_spawn": "1",
-        "OMPI_MCA_oob_tcp_if_include": "${MLP_SOCKET_IFNAME}",
-        "OMPI_MCA_btl_tcp_if_include": "${MLP_SOCKET_IFNAME}",
         "LD_LIBRARY_PATH": "/usr/local/nvidia/lib:/usr/local/nvidia/lib64:/sgl-workspace/nvshmem/install/lib/"
      }
    }' \
