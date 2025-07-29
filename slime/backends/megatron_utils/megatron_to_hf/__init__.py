@@ -4,6 +4,7 @@ import torch.nn.functional as F
 
 from .deepseekv3 import convert_deepseekv3_to_hf
 from .glm4 import convert_glm4_to_hf
+from .glm4moe import convert_glm4moe_to_hf
 from .llama import convert_llama_to_hf
 from .qwen2 import convert_qwen2_to_hf
 from .qwen3moe import convert_qwen3moe_to_hf
@@ -131,7 +132,9 @@ cached_tensors = {}
 
 
 def convert_to_hf(args, model_name, name, param, quantization_config=None):
-    if "glm4" in model_name:
+    if "glm4moe" in model_name:
+        converted_named_tensors = convert_glm4moe_to_hf(args, name, param)
+    elif "glm4" in model_name:
         converted_named_tensors = convert_glm4_to_hf(args, name, param)
     elif "qwen3moe" in model_name:
         converted_named_tensors = convert_qwen3moe_to_hf(args, name, param)

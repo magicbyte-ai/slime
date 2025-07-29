@@ -1,5 +1,7 @@
 import re
 import torch
+from packaging.version import parse
+import sglang
 
 
 def convert_qwen3moe_to_hf(args, name, param):
@@ -37,7 +39,7 @@ def convert_qwen3moe_to_hf(args, name, param):
                 outputs = [
                     (f"model.layers.{layer_idx}.mlp.experts.{expert_idx}.down_proj.weight", param),
                 ]
-                if args.sglang_enable_ep_moe:
+                if parse(sglang.__version__) < parse("0.4.9.post5") and args.sglang_enable_ep_moe:
                     outputs += [
                         (
                             f"model.layers.{layer_idx}.mlp.experts.{expert_idx}.down_proj.input_scale",

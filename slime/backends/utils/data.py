@@ -154,7 +154,6 @@ def process_rollout_data(args, rollout_data_ref, dp_rank, dp_size):
         elif key == "loss_masks":
             val = [torch.tensor(t, dtype=torch.int, device=torch.cuda.current_device()) for t in val]
 
-        # save the data to local storage
         rollout_data[key] = val
 
     return rollout_data
