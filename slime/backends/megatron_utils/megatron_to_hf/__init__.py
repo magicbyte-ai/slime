@@ -37,7 +37,7 @@ def quantize_param(name, weight, weight_block_size):
         block_max = torch.max(torch.abs(qweight), dim=1, keepdim=True)[0]
         block_max = torch.max(block_max, dim=3, keepdim=True)[0]
 
-        scale = block_max.to(torch.float32) / FP8_MIN
+        scale = block_max.to(torch.float32) / FP8_MAX
         qweight = (
             (qweight / scale)
             .clamp(min=FP8_MIN, max=FP8_MAX)
