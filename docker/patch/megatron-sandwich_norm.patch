@@ -54,20 +54,6 @@ index 4bdc7af6..f7a26f45 100644
          )
          ops.append(recv_next_op)
      if len(ops) > 0:
-diff --git a/megatron/core/transformer/multi_latent_attention.py b/megatron/core/transformer/multi_latent_attention.py
-index ed2de748..8115eb76 100644
---- a/megatron/core/transformer/multi_latent_attention.py
-+++ b/megatron/core/transformer/multi_latent_attention.py
-@@ -533,7 +533,8 @@ class MLASelfAttention(MultiLatentAttention):
-                     # is not provided. This makes sure we can run forward directly with
-                     # any sequence length. During training, the sequence length is always
-                     # the full rotary_pos_emb length.
--                    rotary_pos_emb = rotary_pos_emb[0:q_len]
-+                    #rotary_pos_emb = rotary_pos_emb[0:q_len]
-+                    pass
- 
-                 # q_no_pe: [num_tokens, n, qk_head_dim]
-                 # q_pos_emb: [num_tokens, n, qk_pos_emb_head_dim]
 diff --git a/megatron/core/transformer/transformer_config.py b/megatron/core/transformer/transformer_config.py
 index 4e583e5c..121451a2 100644
 --- a/megatron/core/transformer/transformer_config.py

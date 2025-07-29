@@ -1,4 +1,4 @@
-FROM lmsysorg/sglang:dev AS base
+FROM lmsysorg/sglang:latest AS base
 
 # TODO: change to pip install sglang-router after it has a new release
 RUN pip install sglang-router --force-reinstall
