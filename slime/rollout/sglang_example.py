@@ -285,7 +285,7 @@ async def eval_rollout(args, rollout_id):
     for i in range(0, len(args.eval_prompt_data), 2):
         name, path = args.eval_prompt_data[i : i + 2]
         results.update(await eval_rollout_single_dataset(args, rollout_id, name, path))
-    return results, None
+    return results, []
 
 
 async def eval_rollout_single_dataset(args, rollout_id, name, path):
