@@ -13,7 +13,7 @@ import wandb
 from slime.utils.flops_utils import calculate_fwd_flops
 from slime.utils.seqlen_balancing import get_seqlen_balanced_partitions
 from slime.utils.timer import Timer
-from .cp_utils import slice_with_cp
+from .cp_utils import get_sum_of_sample_mean, slice_with_cp
 
 from ..utils.data import DataIterator, get_minimum_num_micro_batch_size
 
@@ -161,6 +161,9 @@ def log_rollout_data(rollout_id, args, rollout_data):
         cp_size = mpu.get_context_parallel_world_size()
         log_dict = {}
         response_lengths = rollout_data["response_lengths"]
+        loss_masks = rollout_data["loss_masks"]
+        total_lengths = rollout_data["total_lengths"]
+
         for key, val in rollout_data.items():
             if key == "tokens" or key == "loss_masks" or key == "sample_indices":
                 continue
@@ -169,13 +172,14 @@ def log_rollout_data(rollout_id, args, rollout_data):
             # - Each dp rank has the same number of samples
             if isinstance(val, list):
                 if isinstance(val[0], torch.Tensor):
-                    if cp_size == 1:
-                        val = sum([v.mean() for v in val]) / len(val)
+                    # NOTE: Here we have to do the clone().detach(), otherwise the tensor will be
+                    # modified in place and will cause problem for the next rollout.
+                    val = torch.cat(val).clone().detach()
+                    if key in ["log_probs", "ref_log_probs", "returns", "advantages"] and loss_masks is not None:
+                        sum_of_sample_mean = get_sum_of_sample_mean(total_lengths, response_lengths, loss_masks)
+                        val = cp_size * sum_of_sample_mean(val) / len(loss_masks)
                     else:
-                        # When cp_size > 1, the denominator should be the length of the response lengths. Also, to make
-                        # sure these values can be divided by `mpu.get_data_parallel_world_size(with_context_parallel=True)`
-                        # multiply by the cp_size.
-                        val = sum([cp_size * v.sum() / l for v, l in zip(val, response_lengths)]) / len(val)
+                        val = val.mean() * cp_size
                 else:
                     val = sum(val) / len(val)
             elif isinstance(val, torch.Tensor):
