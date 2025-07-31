@@ -509,7 +509,12 @@ def get_slime_extra_args_provider(add_custom_arguments=None):
                 default=None,
                 help="lower bound of the value for Dual-clip PPO from https://arxiv.org/pdf/1912.09729",
             )
-            parser.add_argument("--kl-coef", type=float, default=0.00, help="KL penalty in PPO")
+            parser.add_argument(
+                "--kl-coef",
+                type=float,
+                default=0.00,
+                help="KL penalty coefficient for reward shaping. This is applied to the reward signal before advantage calculation.",
+            )
             parser.add_argument(
                 "--loss-type",
                 type=str,
@@ -555,7 +560,12 @@ def get_slime_extra_args_provider(add_custom_arguments=None):
             parser.add_argument(
                 "--use-kl-loss", action="store_true", default=False, help="whether to use KL loss from GRPO"
             )
-            parser.add_argument("--kl-loss-coef", type=float, default=0.0, help="KL penalty in PPO")
+            parser.add_argument(
+                "--kl-loss-coef",
+                type=float,
+                default=0.0,
+                help="KL penalty coefficient for the loss function. This is added to the final PPO loss.",
+            )
             parser.add_argument("--entropy-coef", type=float, default=0.0, help="Entropy loss coef")
             parser.add_argument("--gamma", type=float, default=1.0, help="Discount factor for rewards in REINFORCE++.")
             parser.add_argument("--normalize-advantages", action="store_true", default=False)
