@@ -24,26 +24,24 @@ fi
 echo "HAS_NVLINK: $HAS_NVLINK (detected $NVLINK_COUNT NVLink references)"
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
-source "${SCRIPT_DIR}/models/qwen3-4B.sh"
-MODEL_DIR="/workspace/models"
-DATA_DIR="/workspace/data"
+source "${SCRIPT_DIR}/models/qwen3-32B.sh"
 
 CKPT_ARGS=(
-   --hf-checkpoint ${MODEL_DIR}/Qwen3-4B/
-   --ref-load ${MODEL_DIR}/Qwen3-4B_torch_dist
-   --load ${MODEL_DIR}/Qwen3-4B_sft_slime/
-   --save ${MODEL_DIR}/Qwen3-4B_sft_slime/
-   --save-interval 1000
+   --hf-checkpoint /workspace/models/Qwen3-32B
+   --ref-load /workspace/models/Qwen3-32B_torch_dist
+   --load  /workspace/models/Qwen3-32B_bfcl/
+   --save  /workspace/models/Qwen3-32B_bfcl/
+   --save-interval 200
 )
 
 SFT_ARGS=(
    --rollout-function-path slime.rollout.sft_example.generate_rollout
-   --prompt-data ${DATA_DIR}/openhermes2_5_head1000.parquet
+   --prompt-data /workspace/data/function_calling/merged_function_calling_15510_file_toolace_harder.parquet
    --input-key messages
    --rollout-shuffle
-   --num-epoch 3
-   --rollout-batch-size 32
-   --global-batch-size 32
+   --num-epoch 10
+   --rollout-batch-size 128
+   --global-batch-size 128
 
    --loss-type sft_loss
    --calculate-per-token-loss
@@ -53,9 +51,9 @@ SFT_ARGS=(
 
 # tp:pp: 1,8 / 2,4
 PERF_ARGS=(
-   --tensor-model-parallel-size 1
+   --tensor-model-parallel-size 4
    --sequence-parallel
-   --pipeline-model-parallel-size 1
+   --pipeline-model-parallel-size 2
    --context-parallel-size 1
    --expert-model-parallel-size 1
    --expert-tensor-parallel-size 1
@@ -82,10 +80,10 @@ OPTIMIZER_ARGS=(
 )
 
 WANDB_ARGS=(
-   # --use-wandb
-   # --wandb-project slime-dev
-   # --wandb-group qwen3-4B-base-sft
-   # --wandb-key ${WANDB_KEY}
+   --use-wandb
+   --wandb-project slime-bfcl
+   --wandb-group qwen3-32B-base-sft
+   --wandb-key fd88104f501d04b577045e53389825bba3f28783
 )
 
 MISC_ARGS=(
@@ -102,7 +100,7 @@ MISC_ARGS=(
 # launch the master node of ray in container
 export MASTER_ADDR=${MASTER_ADDR:-"127.0.0.1"}
 export no_proxy="127.0.0.1,${MASTER_ADDR}"
-ray start --head --node-ip-address ${MASTER_ADDR} --num-gpus 2 --disable-usage-stats
+ray start --head --node-ip-address ${MASTER_ADDR} --num-gpus 8 --disable-usage-stats
 
 
 # Build the runtime environment JSON with proper variable substitution
@@ -118,7 +116,7 @@ ray job submit --address="http://127.0.0.1:8265" \
    --runtime-env-json="${RUNTIME_ENV_JSON}" \
    -- python3 train_async.py \
    --actor-num-nodes 1 \
-   --actor-num-gpus-per-node 2 \
+   --actor-num-gpus-per-node 8 \
    ${MODEL_ARGS[@]} \
    ${CKPT_ARGS[@]} \
    ${SFT_ARGS[@]} \
