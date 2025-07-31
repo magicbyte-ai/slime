@@ -14,7 +14,7 @@ def set_default_megatron_args(args):
     args.max_position_embeddings = args.seq_length
     # compatible for megatron
     if hasattr(args, "rope_type") and args.rope_type is None:
-        args.rope_type = "yarn"
+        args.rope_type = "yarn" if args.multi_latent_attention else "rope"
 
     if args.vocab_size and not args.padded_vocab_size:
         args.padded_vocab_size = _vocab_size_with_padding(args.vocab_size, args)

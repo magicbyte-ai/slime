@@ -9,7 +9,7 @@ import torch.distributed as dist
 from slime.backends.megatron_utils.model_provider import get_model_provider_func
 from megatron.core.enums import ModelType
 from megatron.training.arguments import parse_args, validate_args
-from megatron.training.tokenizer.tokenizer import set_default_megatron_args
+from slime.backends.megatron_utils import set_default_megatron_args
 from slime.backends.megatron_utils.initialize import init
 from megatron.training.checkpointing import save_checkpoint
 from megatron.training.training import get_model
