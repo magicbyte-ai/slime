@@ -14,7 +14,7 @@
       - [Environment Setup](#environment-setup)
       - [Examples](#examples)
         - [Dense Model Examples: GLM-4-9B and Qwen3-4B](#Dense-Model-Examples-GLM-4-9B-and-Qwen3-4B)
-        - [MoE Model Example: Qwen3-30B-A3B and DeepSeek-R1](#MoE-Model-Example-Qwen3-30B-A3B-and-DeepSeek-R1)
+        - [MoE Model Examples: GLM-4.5, Qwen3-30B-A3B and DeepSeek-R1](#MoE-Model-Examples-GLM-45-Qwen3-30B-A3B-and-DeepSeek-R1)
         - [Multi-Turn + Tool Calling Example: Search-R1 lite](#Multi-Turn--Tool-Calling-Example-Search-R1-lite)
         - [SFT Example: Qwen3-4B-Base with OpenHermes-2.5](#SFT-Example-Qwen3-4B-Base-with-OpenHermes-25)
   - [Checkpoint Format Conversion](#checkpoint-format-conversion)
@@ -61,11 +61,12 @@ We provide examples to use [GLM-4-9B](https://huggingface.co/THUDM/GLM-Z1-9B-041
 - [Example: GLM-4-9B](docs/en/models/glm4-9B.md).
 - [Example: Qwen3-4B](docs/en/models/qwen3-4B.md).
 
-#### MoE Model Example: Qwen3-30B-A3B and DeepSeek-R1
+#### MoE Model Examples: GLM-4.5, Qwen3-30B-A3B and DeepSeek-R1
 
 For MoE example, please refer to:
 
-- [Example: Qwen3-30B-A3B](docs/en/models/qwen3-30B-A3B.md).
+- [Example: Training GLM-4.5 wtih 64xH100](docs/en/models/glm4.5-355B-A32B.md)
+- [Example: Training Qwen3-30B-A3B with 8xH100](docs/en/models/qwen3-30B-A3B.md).
 - [Example: Training DeepSeek R1 with 128xH100](docs/en/models/deepseek-r1.md)
 
 #### Multi-Turn + Tool Calling Example: Search-R1 lite
@@ -101,21 +102,15 @@ PYTHONPATH=/root/Megatron-LM python tools/convert_hf_to_torch_dist.py \
 This conversion requires GPU, so for large models, you can use the following methods to convert with multiple GPUS, note that you can add parallel config the same way as training:
 
 ```bash
-source scripts/models/deepseek-v3.sh
+source scripts/models/glm4.5-355B-A32B.sh
 PYTHONPATH=/root/Megatron-LM/ torchrun \
    --nproc-per-node 8 \
    --master-addr ${MASTER_ADDR} --master-port 12345 \
-   --nnodes=${NUM_NODES} --node-rank ${NODE_RANK} \
+   --nnodes=2 --node-rank ${NODE_RANK} \
    tools/convert_hf_to_torch_dist.py \
    ${MODEL_ARGS[@]} \
-   --tensor-model-parallel-size 1 \
-   --pipeline-model-parallel-size 8 \
-   --expert-tensor-parallel-size 1 \
-   --expert-model-parallel-size 4 \
-   --decoder-first-pipeline-num-layers 7 \
-   --decoder-last-pipeline-num-layers 6 \
-   --hf-checkpoint $BASE_DIR/DeepSeek-R1-bf16/ \
-   --save $BASE_DIR/DeepSeek-R1_torch_dist/
+   --hf-checkpoint $BASE_DIR/GLM-4.5-355B-A32B/ \
+   --save $BASE_DIR/GLM-4.5-355B-A32B_torch_dist/
 ```
 
 ⚠️ If you encounter an issue where slime cannot be found, please run `pip install -e .` in the slime directory.

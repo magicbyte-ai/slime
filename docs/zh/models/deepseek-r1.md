@@ -106,47 +106,6 @@ CKPT_ARGS=(
 
 slime 会根据 `hf_checkpoint` 中的量化配置从而在训练中进行在线量化。例如当前的例子中，我们使用的是 DeepSeek R1 的 fp8 ckpt，那么在进行参数更新的时候，我们会首先将参数进行 blockwise quant，再传至 sglang。
 
-#### ROLLOUT_ARGS
-
-```bash
-ROLLOUT_ARGS=(
-   # prompt 数据集，每行是个 json
-   --prompt-data /root/dapo-math-17k/dapo-math-17k.jsonl
-   --input-key prompt
-   --label-key label
-   # 如果 prompt 的 `input_key` 中是 openai message，
-   # 会进行 tokenizer.apply_chat_template(...)
-   --apply-chat-template
-   # 是否 shuffle 数据
-   --rollout-shuffle
-
-   # reward model 类型，
-   # slime 提供了很多类型以及用于自定义的 --custom-rm-path
-   --rm-type deepscaler
-
-   # 一共要训练多少 rollout
-   --num-rollout 3000
-   # 一个 rollout 有多少 prompt
-   --rollout-batch-size 128
-   # 每个 prompt 采多少回复
-   # 一个 rollout 会有 rollout_batch_size * n_samples_per_prompt 条
-   --n-samples-per-prompt 8
-   # rollout sampling param
-   --rollout-max-response-len 32768
-   --rollout-temperature 0.8
-
-   # 用双倍的 batch size 进行采样，并筛掉 reward 的方差为 0 的 sample
-   --over-sampling-batch-size 256
-   --dynamic-sampling-filter-path slime.rollout.filter_hub.dynamic_sampling_filters.check_reward_nonzero_std
-
-
-   # 一次 rollout 对应几个训练步
-   --num-steps-per-rollout 4
-   # 是否在训练时 balance data，可能对速度有好处
-   --balance-data
-)
-```
-
 #### PERF_ARGS
 
 一堆 megatron 的并行参数，只有 `--use-dynamic-batch-size` 与 `--max-tokens-per-gpu` 是 slime 添加的。
@@ -244,14 +203,7 @@ SGLANG_ARGS=(
 
 ```bash
 MISC_ARGS=(
-   # default dropout in megatron is 0.1
-   --attention-dropout 0.0
-   --hidden-dropout 0.0
-   # should be good for model performance
-   --accumulate-allreduce-grads-in-fp32
-   --attention-softmax-in-fp32
-   # need to comment this when using model with MLA
-   # --attention-backend flash
+   ...
 
    # use deepep for megatron
    --moe-enable-deepep

@@ -14,7 +14,7 @@
   - [环境准备](#环境准备)
   - [示例](#示例)
     - [Dense 模型示例：GLM-4-9B 与 Qwen3-4B](#Dense-模型示例GLM-4-9B-与-Qwen3-4B)
-    - [MoE 模型示例：Qwen3-30B-A3B 与 DeepSeek-R1](#MoE-模型示例Qwen3-30B-A3B-与-DeepSeek-R1)
+    - [MoE 模型示例：GLM-4.5、Qwen3-30B-A3B 与 DeepSeek-R1](#MoE-模型示例GLM-45Qwen3-30B-A3B-与-DeepSeek-R1)
     - [多轮对话 + 工具调用示例：Search-R1 lite](#多轮对话--工具调用示例Search-R1-lite)
     - [SFT 示例：Qwen3-4B-Base + OpenHermes-2.5](#SFT-示例Qwen3-4B-Base--OpenHermes-25)
 - [Checkpoint 格式转换](#checkpoint-格式转换)
@@ -61,11 +61,12 @@ pip install -e .
 - [示例：GLM-4-9B](docs/zh/models/glm4-9B.md)
 - [示例：Qwen3-4B](docs/zh/models/qwen3-4B.md)
 
-#### MoE 模型示例：Qwen3-30B-A3B 与 DeepSeek-R1
+#### MoE 模型示例：GLM-4.5、Qwen3-30B-A3B 与 DeepSeek-R1
 
 我们也提供了 MoE 模型的示例，请查看：
 
-- [示例：Qwen3-30B-A3B](docs/zh/models/qwen3-30B-A3B.md)
+- [示例：64xH100 训练 GLM-4.5](docs/zh/models/glm4.5-355B-A32B.md)
+- [示例：8xH100 训练 Qwen3-30B-A3B](docs/zh/models/qwen3-30B-A3B.md)
 - [示例：128xH100 训练 DeepSeek-R1](docs/zh/models/deepseek-r1.md)
 
 #### 多轮对话 + 工具调用示例：Search-R1 lite
@@ -103,21 +104,15 @@ PYTHONPATH=/root/Megatron-LM python tools/convert_hf_to_torch_dist.py \
 转换需要使用 GPU，如果模型较大，可以用如下方式进行多机多卡的转换，并且在转换时像训练一样配置上合适的并行，例如：
 
 ```bash
-source scripts/models/deepseek-v3.sh
+source scripts/models/glm4.5-355B-A32B.sh
 PYTHONPATH=/root/Megatron-LM/ torchrun \
    --nproc-per-node 8 \
    --master-addr ${MASTER_ADDR} --master-port 12345 \
-   --nnodes=${NUM_NODES} --node-rank ${NODE_RANK} \
+   --nnodes=2 --node-rank ${NODE_RANK} \
    tools/convert_hf_to_torch_dist.py \
    ${MODEL_ARGS[@]} \
-   --tensor-model-parallel-size 1 \
-   --pipeline-model-parallel-size 8 \
-   --expert-tensor-parallel-size 1 \
-   --expert-model-parallel-size 4 \
-   --decoder-first-pipeline-num-layers 7 \
-   --decoder-last-pipeline-num-layers 6 \
-   --hf-checkpoint $BASE_DIR/DeepSeek-R1-bf16/ \
-   --save $BASE_DIR/DeepSeek-R1_torch_dist/
+   --hf-checkpoint $BASE_DIR/GLM-4.5-355B-A32B/ \
+   --save $BASE_DIR/GLM-4.5-355B-A32B_torch_dist/
 ```
 
 ⚠️  如果出现找不到 slime 的问题，请在 slime 目录下 `pip install -e .`。
