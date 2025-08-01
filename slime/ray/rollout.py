@@ -158,7 +158,7 @@ def _start_router(args):
 
     from sglang_router.launch_router import RouterArgs
 
-    args.sglang_router_ip = get_host_info()[1]
+    args.sglang_router_ip = ray.util.get_node_ip_address()
     args.sglang_router_port = find_available_port(random.randint(3000, 4000))
 
     router_args = RouterArgs(
