@@ -1,16 +1,10 @@
 #!/bin/bash
-
-# for rerun the task
-pkill -9 sglang
-sleep 3
-ray stop --force
-pkill -9 ray
-pkill -9 python
-sleep 3
-pkill -9 ray
-pkill -9 python
-
 set -ex
+
+DATA_HOME="/data/post_train/data/"
+MODEL_HOME="/data/post_train/models/"
+
+MEGATRON_CKPT_PATH="${MODEL_HOME}/Qwen3-4B_slime_yenting"
 
 # will prevent ray from buffering stdout/stderr
 export PYTHONBUFFERED=16
@@ -27,16 +21,16 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
 source "${SCRIPT_DIR}/models/qwen3-4B.sh"
 
 CKPT_ARGS=(
-   --hf-checkpoint /root/Qwen3-4B
+   --hf-checkpoint "${MODEL_HOME}/Qwen3-4B"
    #--hf-checkpoint /root/Qwen3-4B-FP8
-   --ref-load /root/Qwen3-4B_torch_dist
-   --load /root/Qwen3-4B_slime/
-   --save /root/Qwen3-4B_slime/
+   --ref-load "${MODEL_HOME}/Qwen3_4B_yenting_torch_dist"
+   --load "${MEGATRON_CKPT_PATH}"
+   --save "${MEGATRON_CKPT_PATH}"
    --save-interval 20
 )
 
 ROLLOUT_ARGS=(
-   --prompt-data /root/dapo-math-17k/dapo-math-17k.jsonl
+   --prompt-data "${DATA_HOME}/dapo-math-17k/dapo-math-17k.jsonl"
    --input-key prompt
    --label-key label
    --apply-chat-template
@@ -54,7 +48,7 @@ ROLLOUT_ARGS=(
 
 EVAL_ARGS=(
    --eval-interval 20
-   --eval-prompt-data aime /root/aime-2024/aime-2024.jsonl
+   --eval-prompt-data aime "${DATA_HOME}/aime-2024/aime-2024.jsonl"
    --n-samples-per-eval-prompt 16
    --eval-max-response-len 16384
    --eval-top-p 0.7
@@ -105,7 +99,7 @@ WANDB_ARGS=(
 
 SGLANG_ARGS=(
    --rollout-num-gpus-per-engine 2
-   --sglang-mem-fraction-static 0.7
+   --sglang-mem-fraction-static 0.5
 )
 
 MISC_ARGS=(
@@ -119,20 +113,33 @@ MISC_ARGS=(
    --attention-backend flash
 )
 
-# launch the master node of ray in container
-export MASTER_ADDR=${MASTER_ADDR:-"127.0.0.1"}
-ray start --head --node-ip-address ${MASTER_ADDR} --num-gpus 8 --disable-usage-stats --dashboard-host=0.0.0.0 --dashboard-port=8265
+# MASTER_ADDR="147.185.41.214"
+# MASTER_PORT="30265"
+RAY_HEAD_ADDRESS="http://147.185.41.214:30265"
+ROUTER_IP="147.185.41.214"
+ROUTER_PORT="30000"
+# '127.0.1.1', port=3330
+# export MASTER_ADDR=${MASTER_ADDR:-"127.0.0.1"}
+# export MASTER_ADDR=${RAY_HEAD_ADDRESS:-"127.0.0.1"}
+# export MASTER_PORT=${MASTER_PORT:-"12345"}
 
-# Build the runtime environment JSON with proper variable substitution
+export no_proxy="localhost,0.0.0.0,127.0.1.1,127.0.0.1,${ROUTER_IP}"
+
 RUNTIME_ENV_JSON="{
   \"env_vars\": {
-    \"PYTHONPATH\": \"/root/Megatron-LM/\",
+    \"no_proxy\": \"${no_proxy}\",
+    \"MASTER_ADDR\": \"${MASTER_ADDR}\",
+    \"MASTER_PORT\": \"${MASTER_PORT}\",
+    \"PYTHONPATH\": \"/data/post_train/Megatron-LM/\",
     \"CUDA_DEVICE_MAX_CONNECTIONS\": \"1\",
     \"NCCL_NVLS_ENABLE\": \"${HAS_NVLINK}\"
   }
 }"
 
-ray job submit --address="http://127.0.0.1:8265" \
+   # --sglang-router-ip ${MASTER_ADDR} \
+   # --sglang-router-port ${MASTER_PORT} \
+ray job submit --address="${RAY_HEAD_ADDRESS}" \
+   --working-dir="." \
    --runtime-env-json="${RUNTIME_ENV_JSON}" \
    -- python3 train.py \
    --actor-num-nodes 1 \
