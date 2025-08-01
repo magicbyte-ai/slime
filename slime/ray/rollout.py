@@ -161,10 +161,14 @@ def _start_router(args):
     args.sglang_router_ip = ray.util.get_node_ip_address()
     args.sglang_router_port = find_available_port(random.randint(3000, 4000))
 
+    print(f"SGLang router ip: {args.sglang_router_ip}")
+
     router_args = RouterArgs(
         host=args.sglang_router_ip,
         port=args.sglang_router_port,
         balance_abs_threshold=0,
+        prometheus_host=args.sglang_router_ip,
+        prometheus_port=find_available_port(random.randint(3000, 4000)),
     )
 
     if hasattr(router_args, "log_level"):

@@ -142,7 +142,7 @@ ray job submit --address="${RAY_HEAD_ADDRESS}" \
    --working-dir="." \
    --runtime-env-json="${RUNTIME_ENV_JSON}" \
    -- python3 train.py \
-   --actor-num-nodes 1 \
+   --actor-num-nodes 4 \
    --actor-num-gpus-per-node 8 \
    --colocate \
    ${MODEL_ARGS[@]} \
