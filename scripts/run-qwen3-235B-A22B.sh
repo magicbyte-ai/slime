@@ -1,27 +1,10 @@
 #!/bin/bash
-
-# for rerun the task
-pkill -9 sglang
-sleep 3
-ray stop --force
-pkill -9 ray
-pkill -9 python
-sleep 3
-pkill -9 ray
-pkill -9 python
-
 set -ex
 
-# if base folder not set raise error
-if [ -z "${BASE_FOLDER}" ]; then
-  echo "BASE_FOLDER is not set. Please set it to the base directory of your checkpoints."
-  exit 1
-fi
+DATA_HOME="/data/post_train/data/"
+MODEL_HOME="/data/post_train/models/"
 
-if [ -z "${MASTER_ADDR}" ]; then
-  echo "MASTER_ADDR is not set. Please set it to the master node address."
-  exit 1
-fi
+MEGATRON_CKPT_PATH="${MODEL_HOME}/Qwen3-235B-A22B_slime"
 
 # will prevent ray from buffering stdout/stderr
 export PYTHONBUFFERED=16
@@ -38,23 +21,21 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
 source "${SCRIPT_DIR}/models/qwen3-235B-A22B.sh"
 
 CKPT_ARGS=(
-   --hf-checkpoint ${BASE_FOLDER}/Qwen3-235B-A22B
-   #--hf-checkpoint ${BASE_FOLDER}/Qwen3-235B-A22B-FP8
-   --ref-load ${BASE_FOLDER}/Qwen3-235B-A22B_torch_dist
-   --load ${BASE_FOLDER}/Qwen3-235B-A22B_slime/
-   --save ${BASE_FOLDER}/Qwen3-235B-A22B_slime/
+   --hf-checkpoint "${MODEL_HOME}/Qwen3-235B-A22B"
+   #--hf-checkpoint "${MODEL_HOME}/Qwen3-235B-A22B-FP8"
+   --ref-load "${MODEL_HOME}/Qwen3-235B-A22B_torch_dist"
+   --load "${MEGATRON_CKPT_PATH}"
+   --save "${MEGATRON_CKPT_PATH}"
    --save-interval 20
 )
 
 ROLLOUT_ARGS=(
-   --prompt-data ${BASE_FOLDER}/dapo-math-17k/dapo-math-17k.jsonl
+   --prompt-data "${DATA_HOME}/dapo-math-17k/dapo-math-17k.jsonl"
    --input-key prompt
    --label-key label
    --apply-chat-template
    --rollout-shuffle
-
    --rm-type deepscaler
-
    --num-rollout 3000
    --rollout-batch-size 8
    --n-samples-per-prompt 8
@@ -66,8 +47,8 @@ ROLLOUT_ARGS=(
 )
 
 EVAL_ARGS=(
-   #--eval-interval 20
-   --eval-prompt-data aime ${BASE_FOLDER}/aime-2024/aime-2024.jsonl
+   # --eval-interval 20
+   --eval-prompt-data aime "${DATA_HOME}/aime-2024/aime-2024.jsonl"
    --n-samples-per-eval-prompt 16
    --eval-max-response-len 16384
    --eval-top-p 0.7
@@ -140,32 +121,22 @@ MISC_ARGS=(
    --attention-backend flash
 )
 
-# launch the master node of ray in container
-export no_proxy="127.0.0.1,${MASTER_ADDR}"
-ray start --head --node-ip-address ${MASTER_ADDR} --num-gpus 8 --disable-usage-stats --dashboard-host=0.0.0.0 --dashboard-port=8265
-for WORKER_IP in $(awk '{print $1}' /root/mpi_rack_hostfile); do
-  if [[ "$WORKER_IP" == "$MLP_WORKER_0_HOST" ]]; then
-    continue
-  fi
-  echo "Starting Ray worker on ${WORKER_IP}"
-  ssh root@"${WORKER_IP}" \
-    "pkill -9 sglang ; ray stop --force ; pkill -9 python ; ray start --address=${MASTER_ADDR}:6379 --num-gpus 8 --node-ip-address ${WORKER_IP} --disable-usage-stats --dashboard-host=0.0.0.0 --dashboard-port=8265" &
-done
-wait
+RAY_HEAD_ADDRESS="http://147.185.41.214:30265"
+export no_proxy="localhost,0.0.0.0,127.0.1.1,127.0.0.1"
 
-
-# Build the runtime environment JSON with proper variable substitution
 RUNTIME_ENV_JSON="{
   \"env_vars\": {
-    \"PYTHONPATH\": \"/root/Megatron-LM/\",
+    \"no_proxy\": \"${no_proxy}\",
+    \"MASTER_ADDR\": \"\",
+    \"MASTER_PORT\": \"\",
+    \"PYTHONPATH\": \"/data/post_train/Megatron-LM/\",
     \"CUDA_DEVICE_MAX_CONNECTIONS\": \"1\",
     \"NCCL_NVLS_ENABLE\": \"${HAS_NVLINK}\"
-    \"no_proxy\": \"${no_proxy}\",
-    \"MASTER_ADDR\": \"${MASTER_ADDR}\"
   }
 }"
 
-ray job submit --address="http://127.0.0.1:8265" \
+ray job submit --address="${RAY_HEAD_ADDRESS}" \
+   --working-dir="." \
    --runtime-env-json="${RUNTIME_ENV_JSON}" \
    -- python3 train.py \
    --actor-num-nodes 4 \
