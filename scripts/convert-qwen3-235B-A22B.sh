@@ -24,20 +24,26 @@ RUNTIME_ENV_JSON="{
 NS=default
 POD0=raycluster-gpu-gpu-workers-worker-g2dp4
 POD1=raycluster-gpu-gpu-workers-worker-jnrth
+POD2=raycluster-gpu-gpu-workers-worker-554zb
+POD3=raycluster-gpu-gpu-workers-worker-2kcj8
 MASTER_ADDR=$(sudo kubectl get pod -n $NS $POD0 -o jsonpath='{.status.podIP}')
 MASTER_PORT=23456
 
 REPO=/data/post_train/yenting/slime
 HF=/data/post_train/models/Qwen3-235B-A22B-Thinking-2507
-SAVE=/data/post_train/models/Qwen3-235B-A22B-Thinking-2507_torch_dist
+SAVE=/data/post_train/models/Qwen3-235B-A22B-Thinking-2507_torch_dist_tp4_pp4
 
-# 0, 1 is determined by $1. User will pass 0 or 1.
+# 0, 1 is determined by $1. User will pass 0 or 1 or 2 or 3.
 POD_NUM=$1
 
 if [ $POD_NUM -eq 0 ]; then
   POD=$POD0
 elif [ $POD_NUM -eq 1 ]; then
   POD=$POD1
+elif [ $POD_NUM -eq 2 ]; then
+  POD=$POD2
+elif [ $POD_NUM -eq 3 ]; then
+  POD=$POD3
 else
   echo "Invalid pod number: $POD_NUM"
   exit 1
@@ -72,10 +78,14 @@ pip install -e .
 
 torchrun \
   --nproc-per-node 8 \
-  --nnodes 2 --node-rank $POD_NUM \
+  --nnodes 2 \
+   --node-rank $POD_NUM \
   --master-addr $MASTER_ADDR --master-port $MASTER_PORT \
   tools/convert_hf_to_torch_dist.py \
   \${MODEL_ARGS[@]} \
   --hf-checkpoint $HF \
-  --save $SAVE
+  --save $SAVE \
+   --tensor-model-parallel-size 4 \
+   --pipeline-model-parallel-size 4 \
+   --decoder-last-pipeline-num-layers 22
 "

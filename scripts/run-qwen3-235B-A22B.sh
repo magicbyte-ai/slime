@@ -2,9 +2,7 @@
 set -ex
 
 DATA_HOME="/data/post_train/data/"
-MODEL_HOME="/data/post_train/models/"
 
-MEGATRON_CKPT_PATH="${MODEL_HOME}/Qwen3-235B-A22B_slime"
 
 # will prevent ray from buffering stdout/stderr
 export PYTHONBUFFERED=16
@@ -21,11 +19,11 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
 source "${SCRIPT_DIR}/models/qwen3-235B-A22B.sh"
 
 CKPT_ARGS=(
-   --hf-checkpoint "${MODEL_HOME}/Qwen3-235B-A22B"
+   --hf-checkpoint "/data/post_train/models/Qwen3-235B-A22B-Thinking-2507"
    #--hf-checkpoint "${MODEL_HOME}/Qwen3-235B-A22B-FP8"
-   --ref-load "${MODEL_HOME}/Qwen3-235B-A22B_torch_dist"
-   --load "${MEGATRON_CKPT_PATH}"
-   --save "${MEGATRON_CKPT_PATH}"
+   --ref-load "/data/post_train/models/Qwen3-235B-A22B-Thinking-2507_torch_dist/"
+   --load "/data/post_train/yenting/ckpt/qwen3-235b-test/"
+   --save "/data/post_train/yenting/ckpt/qwen3-235b-test/"
    --save-interval 20
 )
 
