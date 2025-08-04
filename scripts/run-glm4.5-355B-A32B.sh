@@ -1,16 +1,9 @@
 #!/bin/bash
-
-# for rerun the task
-pkill -9 sglang
-sleep 3
-ray stop --force
-pkill -9 ray
-pkill -9 python
-sleep 3
-pkill -9 ray
-pkill -9 python
-
 set -ex
+
+DATA_HOME="/data/post_train/data/"
+BASE_DIR=/data/post_train/models/
+
 
 # will prevent ray from buffering stdout/stderr
 export PYTHONBUFFERED=16
@@ -32,7 +25,7 @@ CKPT_ARGS=(
 )
 
 ROLLOUT_ARGS=(
-   --prompt-data $BASE_DIR/dapo-math-17k/dapo-math-17k.jsonl
+   --prompt-data "${DATA_HOME}/dapo-math-17k/dapo-math-17k.jsonl"
    --input-key prompt
    --label-key label
    --apply-chat-template
@@ -54,7 +47,7 @@ ROLLOUT_ARGS=(
 
 EVAL_ARGS=(
    --eval-interval 20
-   --eval-prompt-data aime $BASE_DIR/rl_data/aime-2024.jsonl
+   --eval-prompt-data aime "${DATA_HOME}/aime-2024/aime-2024.jsonl"
    --n-samples-per-eval-prompt 8
    --eval-max-response-len 32768
    --eval-top-p 0.7
@@ -124,38 +117,25 @@ MISC_ARGS=(
    --attention-backend flash
 )
 
-# launch the master node of ray in container
-export MASTER_ADDR=${MLP_WORKER_0_HOST}
-export no_proxy="127.0.0.1,${MASTER_ADDR}"
-ray start --head --node-ip-address ${MASTER_ADDR} --num-gpus 8 --disable-usage-stats --dashboard-host=0.0.0.0 --dashboard-port=8265
-for WORKER_IP in $(awk '{print $1}' /root/mpi_rack_hostfile); do
-  if [[ "$WORKER_IP" == "$MLP_WORKER_0_HOST" ]]; then
-    continue
-  fi
-  echo "Starting Ray worker on ${WORKER_IP}"
-  ssh root@"${WORKER_IP}" \
-    "pkill -9 sglang ; ray stop --force ; pkill -9 python ; ray start --address=${MASTER_ADDR}:6379 --num-gpus 8 --node-ip-address ${WORKER_IP} --disable-usage-stats --dashboard-host=0.0.0.0 --dashboard-port=8265" &
-done
-wait
+RAY_HEAD_ADDRESS="http://147.185.41.214:30265"
 
-
-# Build the runtime environment JSON with proper variable substitution
 RUNTIME_ENV_JSON="{
   \"env_vars\": {
-    \"PYTHONPATH\": \"/root/Megatron-LM/\",
+    \"PYTHONPATH\": \"/data/post_train/Megatron-LM/\",
     \"CUDA_DEVICE_MAX_CONNECTIONS\": \"1\",
     \"NCCL_NVLS_ENABLE\": \"${HAS_NVLINK}\"
   }
 }"
 
-ray job submit --address="http://127.0.0.1:8265" \
+ray job submit --address="${RAY_HEAD_ADDRESS}" \
+   --working-dir="." \
    --runtime-env-json='{
      "env_vars": {
         "no_proxy": "localhost,127.0.0.1,0.0.0.0,${MASTER_ADDR}",
         "GLOO_SOCKET_IFNAME": "${MLP_SOCKET_IFNAME}",
         "TP_SOCKET_IFNAME": "${MLP_SOCKET_IFNAME}",
         "MASTER_ADDR": "${MLP_WORKER_0_HOST}",
-        "PYTHONPATH": "/root/Megatron-LM/",
+        "PYTHONPATH": "/data/post_train/Megatron-LM/",
         "NCCL_CUMEM_ENABLE": "0",
         "CUDA_DEVICE_MAX_CONNECTIONS": "1",
         "NVTE_BWD_LAYERNORM_SM_MARGIN": "20",
@@ -183,7 +163,7 @@ ray job submit --address="http://127.0.0.1:8265" \
    --actor-num-nodes 8 \
    --actor-num-gpus-per-node 8 \
    --colocate \
-   --save-debug-rollout-data /mnt/zhuzilin/github-slime/data.pt \
+   --save-debug-rollout-data $BASE_DIR/data.pt \
    ${MODEL_ARGS[@]} \
    ${CKPT_ARGS[@]} \
    ${ROLLOUT_ARGS[@]} \
