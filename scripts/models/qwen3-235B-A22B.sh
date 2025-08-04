@@ -25,7 +25,7 @@ MODEL_ARGS=(
    --moe-router-score-function softmax
    --moe-token-dispatcher-type alltoall
    --moe-router-topk 8
-   --moe-layer-freq "'([1]*94)'"
+   --moe-layer-freq [1]*94
    --num-experts 128
    --moe-grouped-gemm
    --moe-token-drop-policy probs
