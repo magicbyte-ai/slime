@@ -38,12 +38,13 @@ CKPT_ARGS=(
 
 SFT_ARGS=(
    --rollout-function-path slime.rollout.sft_example.generate_rollout
-   --prompt-data ${DATA_DIR}/openhermes2_5_head1000.parquet
+   # --prompt-data ${DATA_DIR}/openhermes2_5_head1000.parquet
+   --prompt-data ${DATA_DIR}/function_calling/merged_function_calling_15510_file_toolace_harder.parquet
    --input-key messages
    --rollout-shuffle
    --num-epoch 3
-   --rollout-batch-size 32
-   --global-batch-size 32
+   --rollout-batch-size 128
+   --global-batch-size 128
 
    --loss-type sft_loss
    --calculate-per-token-loss
